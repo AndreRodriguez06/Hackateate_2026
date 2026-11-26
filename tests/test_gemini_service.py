@@ -62,6 +62,11 @@ class TestPromociones(unittest.TestCase):
             self.assertGreaterEqual(p["precio_oferta_mxn"], 1.5 * p["costo_porcion_mxn"])
             self.assertTrue(p["copy_promocional"])
 
+    def test_llave_de_ejemplo_cuenta_como_sin_llave(self):
+        with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "tu_api_key_aqui"}):
+            self.assertFalse(gs.configurado())
+            self.assertTrue(gs.generar_promociones_menu(CRITICOS, MENU)["modo_respaldo"])
+
     def test_respuesta_valida_de_gemini(self):
         with mock.patch.object(gs, "_generar", return_value=promos(
                 {"platillo_clave": "enchiladas_suizas", "descuento_pct": 25, "insumos_criticos_usados": ["caviar"]})):

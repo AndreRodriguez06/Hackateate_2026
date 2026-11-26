@@ -1,7 +1,19 @@
-scikit-learn==1.5.2
-numpy==2.1.3
+# ZeroMerma AI — dependencias de Python (probado con Python 3.10 y 3.13)
+# Instalar:  pip install -r requirements.txt
+
+# Backend y API
 fastapi==0.115.5
 uvicorn==0.32.1
-google-genai==3.6.1
-# Solo para correr las pruebas (TestClient)
-httpx==0.27.2
+pydantic==2.10.6
+
+# Modelo de demanda (Random Forest)
+scikit-learn==1.5.2
+numpy==2.1.3
+pandas==2.2.3          # análisis exploratorio; el código actual del sistema no la requiere
+
+# Integración con Google Gemini
+google-genai==1.33.0
+python-dotenv==1.0.1   # lee GEMINI_API_KEY desde .env
+
+# Solo para correr las pruebas automáticas (TestClient de FastAPI)
+httpx==0.28.1

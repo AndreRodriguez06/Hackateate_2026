@@ -53,11 +53,21 @@ LONGITUD_COPY = 160
 # 1. Configuración
 # =============================================================================
 
+LLAVES_DE_EJEMPLO = {"", "tu_api_key_aqui", "pega_aqui_tu_llave"}
+
+
 def _cargar_env() -> None:
-    """Lee .env de la raíz (formato CLAVE=valor) sin dependencias extra. No pisa variables ya definidas."""
+    """Lee .env de la raíz con python-dotenv (o, si no está instalado, con un lector mínimo).
+    No pisa variables ya definidas en el sistema."""
     archivo = RAIZ / ".env"
     if not archivo.exists():
         return
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(archivo, override=False)
+        return
+    except ModuleNotFoundError:
+        pass
     for linea in archivo.read_text(encoding="utf-8").splitlines():
         linea = linea.strip()
         if linea and not linea.startswith("#") and "=" in linea:
@@ -73,8 +83,8 @@ def modelo() -> str:
 
 
 def configurado() -> bool:
-    """True si hay llave. No garantiza que la llave sea válida ni que haya internet."""
-    return bool(os.getenv("GEMINI_API_KEY", "").strip())
+    """True si hay una llave real (no la de ejemplo). No garantiza que sea válida ni que haya internet."""
+    return os.getenv("GEMINI_API_KEY", "").strip() not in LLAVES_DE_EJEMPLO
 
 
 class GeminiNoDisponible(Exception):
@@ -123,7 +133,7 @@ _CLIENTE = None
 def _cliente():
     global _CLIENTE
     if not configurado():
-        raise GeminiNoDisponible("No hay GEMINI_API_KEY configurada.")
+        raise GeminiNoDisponible("No hay GEMINI_API_KEY configurada (copia .env.example como .env y pega tu llave).")
     if _CLIENTE is None:
         try:
             from google import genai
