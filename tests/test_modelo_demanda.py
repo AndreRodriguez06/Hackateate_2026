@@ -4,23 +4,19 @@ Ejecutar desde la raíz del repo:
     python -m unittest discover -s tests -v
 Requiere: pip install -r requirements.txt
 """
-import importlib.util
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+import joblib
+
 RAIZ = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(RAIZ))
 
-
-def _importar(nombre, ruta):
-    spec = importlib.util.spec_from_file_location(nombre, ruta)
-    modulo = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(modulo)
-    return modulo
-
-
-generar_datos = _importar("generar_datos", RAIZ / "data" / "generar_datos.py")
-modelo_demanda = _importar("modelo_demanda", RAIZ / "ml" / "modelo_demanda.py")
+from data import generar_datos  # noqa: E402
+from ml import modelo_demanda  # noqa: E402
 
 
 class TestModeloDemanda(unittest.TestCase):
@@ -76,6 +72,26 @@ class TestModeloDemanda(unittest.TestCase):
         self.assertEqual(self.predecir(insumo="Pechuga de pollo")["demanda_base"],
                          self.predecir(insumo="pollo")["demanda_base"])
 
+    def test_variables_nuevas_de_calendario(self):
+        navidad = self.predecir(dia_semana=5, epoca="navidena", es_dia_festivo=True, evento_plaza=True)
+        cuesta = self.predecir(dia_semana=5, epoca="cuesta_enero")
+        self.assertGreater(navidad["comensales_estimados"], cuesta["comensales_estimados"])
+        self.assertEqual({i["variable"] for i in navidad["importancia_variables"]}, set(modelo_demanda.VARIABLES))
+        self.assertNotIn("temporada_vacacional", modelo_demanda.VARIABLES)
+
+    def test_historial_fuera_de_muestra(self):
+        h = modelo_demanda.cargar_modelo(self.pkl)["historico"]
+        n = modelo_demanda.MIN_DIAS_HISTORICO
+        self.assertTrue(all(v != v for v in h["compra_sugerida"][n - 1]))        # NaN: aún sin modelo
+        self.assertFalse(any(v != v for v in h["compra_sugerida"][n]))           # desde el día 60 hay predicción
+        self.assertEqual(h["primer_dia_comparable"], h["fechas"][n])
+
+    def test_modelo_entrenado_desde_la_terminal_se_puede_cargar(self):
+        destino = Path(self.tmp.name) / "desde_cli.pkl"
+        subprocess.run([sys.executable, str(RAIZ / "ml" / "modelo_demanda.py"), "entrenar", "--db", str(self.db),
+                        "--modelo", str(destino)], check=True, capture_output=True)
+        self.assertEqual(type(joblib.load(destino)["modelo"]).__module__, "ml.modelo_demanda")
+
     def test_entradas_invalidas(self):
         with self.assertRaises(ValueError):
             self.predecir(margen_seguridad=0.30)
@@ -83,6 +99,8 @@ class TestModeloDemanda(unittest.TestCase):
             self.predecir(dia_semana=7)
         with self.assertRaises(ValueError):
             self.predecir(insumo="caviar")
+        with self.assertRaises(ValueError):
+            self.predecir(epoca="vacaciones")
 
     # --- Explicabilidad ---
     def test_importancias_en_porcentaje_suman_100(self):

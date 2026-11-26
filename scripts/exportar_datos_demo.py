@@ -7,8 +7,10 @@ Genera `frontend/datos_demo.js` con respuestas REALES del backend y del modelo
 (calculadas sobre los datos SIMULADOS), para que el frontend funcione aunque se
 abra `index.html` sin servidor:
 
-  * predicciones del Random Forest para las 112 combinaciones de contexto
-    (7 días × quincena × lluvia × evento × vacaciones) y los 46 insumos
+  * predicciones del Random Forest para las 896 combinaciones de contexto
+    (7 días × quincena × lluvia × evento cercano × evento en la plaza × festivo × 4 épocas)
+    y los 46 insumos
+  * historial diario de compras (tradicional, consumo real y sugerencia fuera de muestra)
   * inventario, promociones (modo reglas) y auditoría de los 46 insumos
   * ventas promedio por platillo y día, para recalcular la alerta de excedentes en JS
 
@@ -65,9 +67,10 @@ def main() -> int:
 
     # 2) Predicciones del modelo para todas las combinaciones de contexto.
     paquete = modelo_demanda.cargar_modelo(db.RUTA_MODELO)
-    combos = list(itertools.product(range(7), (0, 1), (0, 1), (0, 1), (0, 1)))
+    combos = list(itertools.product(range(7), (0, 1), (0, 1), (0, 1), (0, 1), (0, 1),
+                                    range(len(modelo_demanda.EPOCAS))))
     pred = paquete["modelo"].predict(np.array(combos, dtype=float))
-    predicciones = {"".join(map(str, c)): [round(float(v), 3) for v in fila] for c, fila in zip(combos, pred)}
+    predicciones = {"".join(map(str, c)): [round(float(v), 2) for v in fila] for c, fila in zip(combos, pred)}
 
     with db.sesion() as con:
         insumos_db = db.insumos_por_clave(con)
@@ -92,7 +95,29 @@ def main() -> int:
         auditoria[i["clave"]] = {"insumo": r["insumo"], "serie": r["serie"]}
     auditoria_totales = {k: r[k] for k in ("periodo", "totales", "metodologia")}
 
-    # 4) Datos para recalcular la alerta de excedentes en el navegador.
+    # 4) Historial diario de compras para la Vista 5 (se agrupa en el navegador).
+    hist = paquete["historico"]
+    fechas = list(hist["fechas"])
+    idx_f = {f: k for k, f in enumerate(fechas)}
+    claves = paquete["salidas"][1:]
+    idx_i = {insumos_db[c]["id"]: j for j, c in enumerate(claves)}
+    trad = [[0.0] * len(claves) for _ in fechas]
+    real = [[0.0] * len(claves) for _ in fechas]
+    with db.sesion() as con:
+        for f in con.execute("SELECT fecha, insumo_id, compra_tradicional, consumo_real FROM consumo_insumos_diario"):
+            trad[idx_f[f["fecha"]]][idx_i[f["insumo_id"]]] = round(f["compra_tradicional"], 2)
+            real[idx_f[f["fecha"]]][idx_i[f["insumo_id"]]] = round(f["consumo_real"], 2)
+    historial = {
+        "fechas": fechas, "primer_dia_comparable": hist["primer_dia_comparable"],
+        "insumos": [{"clave": c, "nombre": insumos_db[c]["nombre"], "unidad": insumos_db[c]["unidad"],
+                     "precio": insumos_db[c]["precio_unitario_mxn"],
+                     "factor": generar_datos.factor_caducidad(insumos_db[c]["vida_util_dias"])} for c in claves],
+        "trad": trad, "real": real,
+        "sugerida": [[None if np.isnan(v) else round(float(v), 2) for v in fila] for fila in hist["compra_sugerida"]],
+        "metodologia": cliente.get("/api/historial-compras").json()["metodologia"],
+    }
+
+    # 5) Datos para recalcular la alerta de excedentes en el navegador.
     alerta = {
         "apertura": alerta_excedente.APERTURA, "cierre": alerta_excedente.CIERRE,
         "exponente": alerta_excedente.EXPONENTE_CURVA, "colchon": alerta_excedente.COLCHON_PREPARACION,
@@ -114,6 +139,7 @@ def main() -> int:
         "origen_dato": "SIMULADO",
         "nota": "Respuestas precalculadas del backend y del modelo para el modo demo autónoma.",
         "variables": paquete["variables"],
+        "epocas": modelo_demanda.EPOCAS,
         "importancias": paquete["importancias"],
         "insumos": insumos,
         "predicciones": predicciones,
@@ -121,6 +147,7 @@ def main() -> int:
         "inventario": inventario,
         "optimizar": optimizar,
         "auditoria": {"por_insumo": auditoria, **auditoria_totales},
+        "historial": historial,
         "alerta": alerta,
     }
     SALIDA.parent.mkdir(parents=True, exist_ok=True)

@@ -13,7 +13,7 @@ Abre http://localhost:8000 (aplicación) o http://localhost:8000/docs (documenta
 Al arrancar, si falta algo, el servidor lo prepara solo:
   * sin data/restaurante.db  -> genera los datos SIMULADOS (Apartado 2)
   * sin lotes a < 24 h        -> refresca las caducidades del inventario para la demo
-  * sin ml/modelo_rf.pkl      -> entrena el modelo (Apartado 3)
+  * sin ml/modelo_rf.pkl, o entrenado con otros datos -> entrena el modelo (Apartado 3)
 Se puede desactivar con la variable de entorno ZEROMERMA_AUTOPREPARAR=0.
 
 Endpoints:
@@ -25,6 +25,7 @@ Endpoints:
   POST /api/alerta-excedente              proyección de sobrante al cierre y ficha de rescate
   POST /api/alerta-excedente/{id}/enviar  marca el aviso como enviado (envío SIMULADO)
   GET  /api/auditoria                     backtesting de los últimos días cerrados
+  GET  /api/historial-compras             compras día a día de todo el historial vs. sugerencia del modelo
 """
 
 from __future__ import annotations
@@ -42,6 +43,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 if str(RAIZ) not in sys.path:
     sys.path.insert(0, str(RAIZ))
 
+import joblib  # noqa: E402
 import numpy as np  # noqa: E402
 from fastapi import FastAPI, HTTPException, Query  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
@@ -51,7 +53,7 @@ from pydantic import BaseModel, Field, field_validator  # noqa: E402
 
 from backend import database as db  # noqa: E402
 from backend import gemini_service  # noqa: E402
-from backend.services import alerta_excedente, rescate_menu  # noqa: E402
+from backend.services import alerta_excedente, historial_compras, rescate_menu  # noqa: E402
 from data import generar_datos  # noqa: E402
 from ml import modelo_demanda  # noqa: E402
 
@@ -84,9 +86,22 @@ def preparar_entorno() -> None:
         if not vigentes_criticos:
             log.info("El inventario no tiene lotes a < 24 h (datos viejos): refrescando caducidades...")
             generar_datos.main(["--db", str(ruta_db), "--solo-inventario", "--silencioso"])
+    motivo = None
     if not ruta_modelo.exists():
-        log.info("No existe %s: entrenando el modelo...", ruta_modelo)
+        motivo = f"No existe {ruta_modelo}"
+    else:
+        with db.sesion() as con:
+            fila = con.execute("SELECT valor FROM meta_dataset WHERE clave = 'generado_en'").fetchone()
+        try:
+            paquete = joblib.load(ruta_modelo)
+            if paquete.get("dataset_generado_en") != (fila[0] if fila else None) or "historico" not in paquete:
+                motivo = "El modelo se entrenó con otra versión de los datos"
+        except Exception as err:  # archivo dañado o de una versión anterior del código
+            motivo = f"No se pudo leer el modelo ({type(err).__name__})"
+    if motivo:
+        log.info("%s: entrenando el modelo (≈ 10 s)...", motivo)
         modelo_demanda.entrenar(ruta_db, ruta_modelo, ruta_metricas=None, verbose=False)
+        modelo_demanda._CACHE.clear()
 
 
 @asynccontextmanager
@@ -150,8 +165,10 @@ class PrediccionEntrada(BaseModel):
     dia_semana: int = Field(..., ge=0, le=6, description="0 = lunes ... 6 = domingo.")
     es_quincena: bool = False
     lluvia: bool = False
-    evento: bool = False
-    temporada_vacacional: bool = False
+    evento: bool = Field(False, description="Evento cercano (concierto, partido, evento universitario).")
+    evento_plaza: bool = Field(False, description="Evento en la plaza (Buen Fin, exposición, concierto en la plaza).")
+    es_dia_festivo: bool = False
+    epoca: Literal["regular", "navidena", "cuesta_enero", "verano"] = "regular"
     margen_seguridad: float = Field(0.08, ge=0, le=0.25, description="Fracción: 0.08 = 8 %.")
 
 
@@ -337,7 +354,8 @@ def predecir(entrada: PrediccionEntrada):
     try:
         r = modelo_demanda.predecir_compra(
             entrada.insumo, entrada.dia_semana, entrada.es_quincena, entrada.lluvia, entrada.evento,
-            entrada.margen_seguridad, entrada.temporada_vacacional, ruta_modelo=db.RUTA_MODELO)
+            entrada.margen_seguridad, entrada.evento_plaza, entrada.es_dia_festivo, entrada.epoca,
+            ruta_modelo=db.RUTA_MODELO)
     except FileNotFoundError as err:
         raise error_datos_no_listos(err) from err
     except ValueError as err:
@@ -422,6 +440,31 @@ def enviar_alerta(alerta_id: int):
             return alerta_excedente.marcar_enviada(con, alerta_id)
     except KeyError as err:
         raise HTTPException(status_code=404, detail=f"No existe la alerta {alerta_id}") from err
+
+
+@app.get("/api/historial-compras", tags=["Vista 5 · Historial de compras"])
+def historial(
+    agrupar: Literal["dia", "semana", "mes"] = Query("semana", description="Agrupar por día, semana o mes."),
+    insumo: str = Query("todos", description="Clave del insumo o 'todos' (en $MXN)."),
+):
+    """
+    Lo que se compró cada día (método tradicional), lo que se consumió y lo que habría sugerido
+    ZeroMerma AI, para todo el historial de la base. La sugerencia es una predicción fuera de
+    muestra: cada día se predice con un modelo que no lo vio.
+    """
+    try:
+        paquete = modelo_demanda.cargar_modelo(db.RUTA_MODELO)
+        with conexion() as con:
+            r = historial_compras.construir(con, paquete, agrupar, insumo)
+    except FileNotFoundError as err:
+        raise error_datos_no_listos(err) from err
+    except KeyError as err:
+        raise HTTPException(status_code=404, detail=f"Insumo no encontrado: {err.args[0]}") from err
+    except LookupError as err:
+        raise HTTPException(status_code=503, detail=f"{err} Reinicia el servidor o corre "
+                            "`python ml/modelo_demanda.py entrenar`.") from err
+    r["es_simulado"] = es_simulado(r.pop("origen_dato"))
+    return r
 
 
 _CACHE_BACKTEST: dict = {}

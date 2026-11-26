@@ -11,3 +11,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Exportaciones a CSV (se regeneran con scripts/exportar_csv.py)
+data/csv/

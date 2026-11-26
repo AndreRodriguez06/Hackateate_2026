@@ -1,7 +1,7 @@
 # 02 · Base de datos SQLite y datos históricos simulados
 
 > **Apartado 2 · Orden 1.2** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_generar_datos.py`, 10 pruebas).
+> Estado: ✅ implementado y probado (`tests/test_generar_datos.py`, 12 pruebas).
 
 > ⚠️ **Todos los registros de esta base de datos son SIMULADOS.** Representan un restaurante hipotético de plaza comercial y no corresponden a ningún negocio real. Cada tabla tiene la columna `origen_dato` y la base rechaza cualquier registro que no diga `SIMULADO` o `REAL`.
 
@@ -28,12 +28,13 @@ Tener datos históricos suficientes y coherentes para:
 Desde la raíz del repositorio:
 
 ```bash
-python data/generar_datos.py                    # crea data/restaurante.db (180 días, semilla 42)
+python data/generar_datos.py                    # crea data/restaurante.db (365 días, semilla 42)
 python data/generar_datos.py --solo-inventario  # justo antes de la demo: refresca las caducidades
+python scripts/exportar_csv.py                  # exporta todas las tablas a data/csv/ para Excel
 python -m unittest discover -s tests -v         # corre las pruebas
 ```
 
-Opciones: `--dias N` (mínimo 150), `--semilla N`, `--fecha-fin AAAA-MM-DD`, `--db ruta`, `--silencioso`.
+Opciones: `--dias N` (mínimo 150; se recomiendan 365 o más para cubrir todas las épocas del año), `--semilla N`, `--fecha-fin AAAA-MM-DD`, `--db ruta`, `--silencioso`.
 
 Salida esperada (los números exactos cambian con la fecha de ejecución):
 
@@ -42,11 +43,14 @@ Registros por tabla (todos SIMULADOS):
   insumos                        46
   platillos                      30
   recetas                       176
-  contexto_diario               180
-  ventas_diarias               5400
-  consumo_insumos_diario       8280
+  contexto_diario               365
+  ventas_diarias              10950
+  consumo_insumos_diario      16790
   inventario_lotes               47
-  TOTAL                       14159
+  TOTAL                       28404
+
+Historial: 2025-11-26 a 2026-11-25 | comensales promedio/día: 159 | días con lluvia: 32% | días de quincena: 13%
+Días festivos: 12 | días con evento en la plaza: 27 | épocas: cuesta de enero 46 d, temporada navideña 31 d, regular 226 d, verano 62 d
 
 Inventario a menos de 24 h de caducar:
   - Pechuga de pollo: 7.5 kg (caduca en 18.0 h)
@@ -78,7 +82,7 @@ erDiagram
 | `insumos` | un insumo que se compra | `unidad`, `precio_unitario_mxn`, `vida_util_dias`, `fuente_precio` | Todo |
 | `platillos` | uno de los 30 platillos del menú vigente | `precio_venta_mxn`, `popularidad_base` | Gemini, alertas |
 | `recetas` | cantidad de un insumo en una porción | `cantidad_por_porcion` | Consumo, costo por porción, Gemini |
-| `contexto_diario` | un día de operación | `dia_semana`, `es_quincena`, `lluvia`, `temperatura_c`, `evento_cercano`, `temporada_vacacional`, `comensales` | Variables del modelo ML |
+| `contexto_diario` | un día de operación | `dia_semana`, `es_quincena`, `es_dia_festivo`, `nombre_festivo`, `epoca_anio`, `lluvia`, `temperatura_c`, `evento_cercano`, `evento_plaza`, `comensales` | Variables del modelo ML |
 | `ventas_diarias` | porciones vendidas de un platillo en un día | `porciones_vendidas`, `ingreso_mxn` | Alertas, auditoría |
 | `consumo_insumos_diario` | uso real de un insumo en un día vs. compra tradicional | `consumo_real` (**objetivo del ML**), `compra_tradicional`, `merma_tradicional`, `faltante_tradicional` | Modelo, backtesting |
 | `inventario_lotes` | un lote en almacén | `cantidad`, `fecha_caducidad` | Vista 2, Gemini |
@@ -167,7 +171,8 @@ Todos los supuestos están como constantes al inicio de `generar_datos.py`, para
 
 ```
 comensales = base_del_día_de_la_semana
-             × (1 + 0.12·quincena + 0.06·lluvia + 0.15·evento − 0.10·vacaciones)
+             × (1 + 0.12·quincena + 0.06·lluvia + 0.15·evento_cercano + 0.20·evento_plaza
+                  + 0.18·día_festivo + efecto_época)
              × tendencia (+3 % a lo largo del periodo)
              × ruido aleatorio (normal, desviación 7 %)
 ```
@@ -177,8 +182,12 @@ comensales = base_del_día_de_la_semana
 | Base lunes a domingo | 118, 112, 122, 132, 168, 195, 172 | Plaza comercial: más gente viernes a domingo. |
 | Quincena | +12 % | Día de pago y el siguiente; si cae en fin de semana, se paga el viernes. |
 | Lluvia | +6 % | La plaza está techada: la gente se refugia y come ahí. |
-| Evento cercano | +15 % | Concierto o evento universitario (más probable viernes y sábado). |
-| Vacaciones escolares | −10 % | Menos estudiantes del campus cercano. |
+| Evento cercano | +15 % | Concierto, partido o evento universitario cerca (más probable viernes y sábado). |
+| Evento en la plaza | +20 % | Buen Fin (viernes a lunes del puente de la Revolución) y eventos al azar: 10 % de los viernes a domingos, 4 % del resto. |
+| Día festivo | +18 % | La gente pasea en la plaza. Además se comporta como fin de semana en la mezcla de platillos. |
+| Época: temporada navideña (diciembre) | +15 % | Aguinaldo, compras y posadas. |
+| Época: cuesta de enero (1 ene – 15 feb) | −12 % | Menos gasto después de diciembre. |
+| Época: verano (julio y agosto) | +5 % | Familias de paseo en la plaza durante el verano. |
 | Probabilidad de lluvia | 5 % a 65 % según el mes | Perfil de temporada de lluvias del centro de México (junio a septiembre). |
 
 ### 5.2 Ventas por platillo
@@ -194,6 +203,13 @@ comensales = base_del_día_de_la_semana
 | Fin de semana | Hotcakes (+30 %), chilaquiles, huevos rancheros y pozole (+25 %), huevos a la mexicana, tamales, jugo y flan (+20 %) | |
 | Quincena | Hamburguesa, bistec y flan (+15 %), club sándwich y tacos al pastor (+10 %) | |
 | Calor (≥ 22 °C) | Limonada (+25 %), agua fresca (+20 %), licuado (+10 %) | |
+| Evento en la plaza | Hamburguesa (+25 %), tacos al pastor (+20 %), limonada (+15 %), agua fresca (+10 %) | |
+| Temporada navideña | Tamales (+30 %), flan (+25 %), café (+20 %), pozole (+15 %) | |
+| Cuesta de enero | Molletes y quesadillas (+20 %), sopa y enfrijoladas (+15 %) | Bistec y club sándwich (−15 %), hamburguesa (−10 %) |
+| Verano | Limonada (+25 %), agua fresca (+20 %), ensalada (+15 %) | Pozole (−15 %) |
+| Fechas especiales | 16 de septiembre: pozole ×2 · 12 de diciembre: tamales +50 % · Día de las Madres: flan +50 %, enchiladas +20 % | |
+
+**Días festivos** (`dias_festivos()`): los de descanso obligatorio de la Ley Federal del Trabajo (art. 74) —1 de enero, primer lunes de febrero, tercer lunes de marzo, 1 de mayo, 16 de septiembre, tercer lunes de noviembre y 25 de diciembre— más Jueves y Viernes Santo (calculados a partir de la Pascua), 10 de mayo, 2 de noviembre y 12 de diciembre.
 
 Resultado en el historial generado: lo más vendido son las bebidas (agua fresca, unas 58 al día) y entre los platillos, chilaquiles (≈ 12 al día) y enchiladas (≈ 11). Los menos pedidos rondan 5 porciones al día.
 
@@ -246,6 +262,7 @@ El semáforo **no se guarda**: el backend lo calcula al consultar, porque cambia
 | Precio con columna `fuente_precio` | Precio sin fuente | La rúbrica pide citar fuentes; la columna muestra qué falta verificar. |
 | Generador sin dependencias | pandas / numpy / Faker | Cualquiera lo corre con Python recién instalado. |
 | Semilla fija | Datos aleatorios en cada ejecución | Todo el equipo ve los mismos números y el modelo es reproducible. |
+| 365 días por defecto | 180 días | Para que el historial cubra diciembre, enero y verano y el modelo aprenda las épocas del año. |
 | Caducidades relativas a "ahora" | Fechas fijas | En la demo siempre hay insumos a menos de 24 h. |
 | Simular el consumo desde ventas × recetas | Simular el consumo directamente | El consumo queda coherente con lo vendido y con el recetario que usa Gemini. |
 | `restaurante.db` fuera de git | Subir el archivo | Se regenera en 1 segundo y evita conflictos de merge. |
@@ -260,6 +277,7 @@ El semáforo **no se guarda**: el backend lo calcula al consultar, porque cambia
 | Precios de insumos | **SIMULADO (provisional)** | La columna `fuente_precio` lo indica. **Pendiente:** reemplazar con los valores de PROFECO *Quién es Quién en los Precios* y registrar fecha de consulta y ciudad. |
 | Perfil de lluvia por mes | **SIMULADO** con forma basada en la temporada de lluvias del centro de México | Si se quiere hacer REAL: usar normales climatológicas del Servicio Meteorológico Nacional (SMN/CONAGUA) y citarlas. |
 | Calendario de quincenas | Regla real de pago (días 15 y último del mes) aplicada a datos simulados | |
+| Calendario de días festivos y Buen Fin | Fechas reales; su **efecto** en ventas es SIMULADO | |
 
 ### Pendiente para cumplir la regla de fuentes
 
@@ -270,7 +288,9 @@ Para cada insumo, consultar en PROFECO *Quién es Quién en los Precios* y actua
 
 1. `python data/generar_datos.py` termina con `Verificación OK`.
 2. `python -m unittest discover -s tests -v` muestra 10 pruebas `ok`. Comprueban:
-   - al menos 150 días de historial;
+   - 365 días de historial por defecto;
+   - las columnas nuevas existen (festivo, época, evento en la plaza), no existe "vacaciones" y aparecen las 4 épocas;
+   - fechas de festivos (16 de septiembre, Viernes Santo, tercer lunes de noviembre), épocas y Buen Fin;
    - todas las tablas etiquetadas `SIMULADO`;
    - la base rechaza un registro con otra etiqueta;
    - hay al menos 2 lotes a menos de 24 h de caducar;
@@ -285,6 +305,35 @@ Para cada insumo, consultar en PROFECO *Quién es Quién en los Precios* y actua
 ```bash
 python -c "import sqlite3; c=sqlite3.connect('data/restaurante.db'); print(c.execute('SELECT * FROM meta_dataset').fetchall())"
 ```
+
+## 8.1 Cómo ver la base de datos completa
+
+| Opción | Cómo | Ideal para |
+|---|---|---|
+| **Excel o Google Sheets** | `python scripts/exportar_csv.py` crea `data/csv/` con un CSV por tabla, más `compras_diarias.csv` y `ventas_detalle.csv` con nombres legibles | Revisar y filtrar sin programar |
+| **DB Browser for SQLite** (gratis, sqlitebrowser.org) | Abrir `data/restaurante.db` → pestaña "Browse Data" | Explorar tablas y hacer consultas |
+| **VS Code** | Extensión "SQLite Viewer" y abrir `data/restaurante.db` | Si ya usan VS Code |
+| **La aplicación** | Vista 5 · Historial de Compras: compras día a día, por semana o por mes | Ver compras contra consumo y ahorro |
+| **Terminal** | `sqlite3 data/restaurante.db "SELECT * FROM contexto_diario LIMIT 10;"` | Consultas rápidas |
+
+## 8.2 ¿Siempre se simulan los mismos datos?
+
+**Sí, con la misma semilla y la misma fecha final.** El generador usa `random.Random(semilla)` con semilla 42 por defecto, así que repite la misma secuencia de números aleatorios. Dos detalles:
+
+- La **fecha final** por defecto es "ayer". Si generas la base otro día, el calendario se recorre: los mismos números aleatorios caen en otras fechas, y cambian las quincenas, festivos y épocas de cada día. Para obtener exactamente lo mismo, fija la fecha: `--fecha-fin 2026-11-25`.
+- Las **caducidades del inventario** siempre se calculan respecto a la hora en que corres el script.
+
+## 8.3 Cómo simular datos distintos
+
+| Quiero… | Comando o cambio |
+|---|---|
+| Otro restaurante con el mismo comportamiento promedio | `python data/generar_datos.py --semilla 7` (cualquier número) |
+| Más historia | `python data/generar_datos.py --dias 730` |
+| Un periodo específico | `python data/generar_datos.py --fecha-fin 2026-06-30` |
+| Otro tipo de restaurante | Editar las constantes de la sección 2 de `data/generar_datos.py`: `COMENSALES_BASE`, `EFECTO_*`, `EFECTO_EPOCA`, `PROB_LLUVIA_MES`, `COLCHON_TRADICIONAL`… |
+| Otro menú | Editar `PLATILLOS`, `RECETAS` e `INSUMOS` (el script valida que todo sea consistente) |
+
+Después de generar datos nuevos **no hace falta reentrenar a mano**: al arrancar, el backend detecta que el modelo se entrenó con otros datos y lo reentrena solo (≈ 10 s). Si quieres el modo demo sin servidor con esos datos, corre también `python scripts/exportar_datos_demo.py`.
 
 ## 9. Preguntas probables de los jueces
 

@@ -1,7 +1,7 @@
 # 04 · Backend y API REST (FastAPI)
 
 > **Apartado 4 · Orden 2.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_api.py`, 17 pruebas). Total del repositorio: 56 pruebas.
+> Estado: ✅ implementado y probado (`tests/test_api.py`, 20 pruebas). Total del repositorio: 64 pruebas.
 
 > ⚠️ **Todas las respuestas provienen de datos SIMULADOS.** Cada respuesta incluye `es_simulado: true`, y los lotes del inventario lo indican uno por uno.
 
@@ -147,8 +147,10 @@ Compra sugerida de un insumo con el Random Forest.
 | `dia_semana` | entero | sí | 0 (lunes) a 6 (domingo) |
 | `es_quincena` | bool | no (`false`) | |
 | `lluvia` | bool | no (`false`) | |
-| `evento` | bool | no (`false`) | evento cercano |
-| `temporada_vacacional` | bool | no (`false`) | |
+| `evento` | bool | no (`false`) | evento cercano (concierto, partido, evento universitario) |
+| `evento_plaza` | bool | no (`false`) | evento en la plaza (Buen Fin, exposición, concierto en la plaza) |
+| `es_dia_festivo` | bool | no (`false`) | |
+| `epoca` | texto | no (`"regular"`) | `regular`, `navidena`, `cuesta_enero` o `verano` |
 | `margen_seguridad` | decimal | no (`0.08`) | 0 a 0.25 |
 
 ```json
@@ -157,14 +159,14 @@ Compra sugerida de un insumo con el Random Forest.
 
 ```json
 { "insumo": { "clave": "pollo", "nombre": "Pechuga de pollo", "unidad": "kg" },
-  "clientes_estimados": 186, "demanda_base": 14.66,
-  "margen_seguridad": 0.02, "margen_recomendado": 0.116,
-  "compra_sugerida": 14.96, "unidad": "kg", "costo_estimado_mxn": 2019.04,
-  "compra_tradicional": 19.1, "costo_tradicional_mxn": 2578.5,
-  "merma_evitada": 2.07, "merma_evitada_mxn": 279.45,
+  "clientes_estimados": 194, "demanda_base": 15.06,
+  "margen_seguridad": 0.02, "margen_recomendado": 0.144,
+  "compra_sugerida": 15.37, "unidad": "kg", "costo_estimado_mxn": 2074.42,
+  "compra_tradicional": 18.52, "costo_tradicional_mxn": 2500.2,
+  "merma_evitada": 1.575, "merma_evitada_mxn": 212.63,
   "riesgo_desabasto": true,
   "mensaje_riesgo": "Riesgo alto de desabasto: con un margen menor a 4 % la compra puede quedarse corta en hora pico.",
-  "importancia_variables": [ { "variable": "dia_semana", "nombre": "Día de la semana", "porcentaje": 92.7 } ],
+  "importancia_variables": [ { "variable": "epoca", "nombre": "Época del año", "porcentaje": 25.1 } ],
   "es_simulado": true }
 ```
 
@@ -198,12 +200,12 @@ El cuerpo puede ir vacío (`{}`).
       "platillo_clave": "enchiladas_suizas", "platillo": "Enchiladas Suizas", "categoria": "plato fuerte",
       "tipo": "descuento", "descuento_pct": 30,
       "precio_normal_mxn": 120.0, "precio_oferta_mxn": 84, "costo_insumos_porcion_mxn": 44.55,
-      "porciones_objetivo": 16,
-      "insumos_rescatados": [ { "clave": "pollo", "nombre": "Pechuga de pollo", "cantidad": 2.88, "unidad": "kg", "valor_mxn": 388.8 },
-                              { "clave": "crema", "nombre": "Crema ácida", "cantidad": 0.96, "unidad": "L", "valor_mxn": 69.12 } ],
-      "perdida_si_se_tira_mxn": 457.92, "margen_recuperado_mxn": 631.2,
+      "porciones_objetivo": 17,
+      "insumos_rescatados": [ { "clave": "pollo", "nombre": "Pechuga de pollo", "cantidad": 3.06, "unidad": "kg", "valor_mxn": 413.1 },
+                              { "clave": "crema", "nombre": "Crema ácida", "cantidad": 1.02, "unidad": "L", "valor_mxn": 73.44 } ],
+      "perdida_si_se_tira_mxn": 486.54, "margen_recuperado_mxn": 670.65,
       "copy_promocional": "¡Solo hoy! Enchiladas Suizas a $84 (antes $120, ahorras $36). Preparado al momento con ingredientes del día. Disponible hasta agotar existencias." } ],
-  "totales": { "perdida_evitable_mxn": 1174.32, "margen_recuperado_mxn": 2059.64, "valor_critico_total_mxn": 1890.5 },
+  "totales": { "perdida_evitable_mxn": 1217.25, "margen_recuperado_mxn": 2097.59, "valor_critico_total_mxn": 1890.5 },
   "es_simulado": true }
 ```
 
@@ -294,13 +296,13 @@ Backtesting de los últimos días **cerrados**: compra tradicional contra demand
 | `margen` | decimal 0–0.25 | recomendado por insumo | Margen fijo opcional. |
 
 ```json
-{ "insumo": { "clave": "pollo", "nombre": "Pechuga de pollo", "unidad": "kg", "margen_aplicado": 0.116 },
+{ "insumo": { "clave": "pollo", "nombre": "Pechuga de pollo", "unidad": "kg", "margen_aplicado": 0.144 },
   "periodo": { "desde": "2026-11-19", "hasta": "2026-11-25", "dias": 7, "modelo_entrenado_hasta": "2026-11-18" },
-  "serie": [ { "fecha": "2026-11-19", "compra_tradicional": 19.0, "demanda_real": 11.54, "compra_sugerida": 11.78 } ],
+  "serie": [ { "fecha": "2026-11-19", "compra_tradicional": 22.0, "demanda_real": 11.42, "compra_sugerida": 12.33 } ],
   "totales": {
-    "tradicional": { "compra_mxn": 69656.5, "merma_kg": 125.77, "merma_mxn": 9472.94, "demanda_no_cubierta_pct": 0.27 },
-    "zeromerma":   { "compra_mxn": 47148.84, "merma_kg": 30.39, "merma_mxn": 2217.2, "demanda_no_cubierta_pct": 0.07 },
-    "ahorro_compra_mxn": 22507.66, "merma_evitada_kg": 95.38, "merma_evitada_mxn": 7255.74, "reduccion_merma_pct": -76.6 },
+    "tradicional": { "compra_mxn": 78862.5, "merma_kg": 174.85, "merma_mxn": 12739.03, "demanda_no_cubierta_pct": 0.04 },
+    "zeromerma":   { "compra_mxn": 46943.59, "merma_kg": 27.86, "merma_mxn": 1920.15, "demanda_no_cubierta_pct": 1.03 },
+    "ahorro_compra_mxn": 31918.91, "merma_evitada_kg": 146.99, "merma_evitada_mxn": 10818.88, "reduccion_merma_pct": -84.9 },
   "metodologia": "Modelo reentrenado solo con días anteriores al periodo (sin fuga de datos). ...",
   "es_simulado": true }
 ```
@@ -310,6 +312,42 @@ Cómo se calcula:
 - **Merma** = máx(compra − consumo real, 0) × fracción que caduca según la vida útil (misma regla del Apartado 2).
 - **kg** solo suma insumos medidos en kg; **$MXN** suma los 46 insumos.
 - **Simplificación:** cada día se evalúa por separado; no se arrastra el sobrante al día siguiente.
+- **Lectura honesta de esta semana:** incluye el Buen Fin. La merma baja 85 %, pero la demanda no cubierta con ZeroMerma (1.03 %) es mayor que con la compra tradicional (0.04 %): en días extraordinarios, comprar de más cubrió mejor. Sobre todo el historial (sección 4.9) la demanda no cubierta es similar en ambos (0.98 % contra 1.00 %).
+
+### 4.9 `GET /api/historial-compras` · Vista 5
+
+Lo que se compró **cada día** según la base de datos (compra tradicional), lo que se consumió y lo que habría sugerido ZeroMerma AI, para **todo el historial**.
+
+| Parámetro (query) | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `agrupar` | `dia` \| `semana` \| `mes` | `semana` | Las semanas empiezan en lunes. |
+| `insumo` | clave o `todos` | `todos` | Con `todos` los valores van en $MXN (kg, L y piezas no se pueden sumar). |
+
+```json
+{ "insumo": { "clave": "todos", "nombre": "Todos los productos", "unidad": "MXN" },
+  "agrupar": "mes", "unidad": "MXN",
+  "periodo": { "desde": "2025-11-26", "hasta": "2026-11-25", "dias": 365,
+               "primer_dia_comparable": "2026-01-25", "dias_sin_prediccion": 60 },
+  "serie": [ { "periodo": "2026-11", "etiqueta": "Nov 2026", "desde": "2026-11-01", "hasta": "2026-11-25",
+               "dias": 25, "dias_comparables": 25,
+               "compra_tradicional": 275648.5, "consumo_real": 160116.62, "compra_sugerida": 177512.65,
+               "compra_tradicional_mxn": 275648.5, "compra_sugerida_mxn": 177512.65,
+               "merma_tradicional_mxn": 40349.82, "merma_zeromerma_mxn": 6954.63,
+               "ahorro_compra_mxn": 98135.85, "merma_evitada_mxn": 33395.19 } ],
+  "totales": { "dias_comparables": 305, "compra_tradicional_mxn": 3073056.5, "compra_sugerida_mxn": 2158100.02,
+               "ahorro_compra_mxn": 914956.48, "merma_tradicional_mxn": 411235.19, "merma_zeromerma_mxn": 113674.79,
+               "merma_evitada_mxn": 297560.4, "merma_evitada_kg": 4100.28, "reduccion_merma_pct": -72.4,
+               "demanda_no_cubierta_tradicional_pct": 1.0, "demanda_no_cubierta_zeromerma_pct": 0.98 },
+  "metodologia": "…", "es_simulado": true }
+```
+
+Cómo se calcula:
+- **Compra tradicional y consumo real:** registros diarios de la tabla `consumo_insumos_diario`.
+- **Compra sugerida:** predicción **fuera de muestra** guardada en el modelo. Cada bloque de 30 días se predijo con un modelo entrenado solo con los días anteriores, × (1 + margen recomendado). Ver `03_modelo_ml.md`, sección 8.
+- **Primeros 60 días:** sin predicción, porque el modelo necesita historial para entrenar. En la serie aparecen con `compra_sugerida: null`. Un periodo solo se compara si todos sus días tienen predicción.
+- **Totales:** solo sobre los días comparables.
+
+Errores: **404** insumo inexistente · **422** agrupación inválida · **503** si el modelo no corresponde a la base (se corrige al reiniciar el servidor, que reentrena solo).
 
 ## 5. Decisiones técnicas
 
@@ -336,16 +374,18 @@ Cómo se calcula:
 
 ## 7. Cómo verificar que funciona
 
-1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 8 endpoints.
+1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 9 endpoints.
 2. En `/docs`, probar `POST /api/predecir` con margen `0.02`: `riesgo_desabasto: true`.
-3. `python -m unittest discover -s tests -v`: 56 pruebas. Las 17 de la API comprueban:
+3. `python -m unittest discover -s tests -v`: 64 pruebas. Las 20 de la API comprueban:
    - el arranque genera datos y modelo;
    - el inventario está ordenado y con el semáforo correcto, y el filtro por estado funciona;
    - la predicción cumple la fórmula, alerta el desabasto y responde 422/400 a entradas inválidas;
    - las promociones solo usan platillos del menú con insumos críticos y precio ≥ 1.5 × costo;
    - sin llave se usa el respaldo; con un Gemini simulado, la respuesta válida se acepta **con cifras recalculadas**, se rechaza un platillo inventado y se rechaza un descuento no rentable;
    - la alerta con ventas lentas genera ficha (ventana 16:00–18:00, con recomendaciones de inocuidad) y se puede "enviar"; a las 17:45 ya no hay ventana viable; con `generar_ficha: false` solo proyecta sin registrar; sin sobrante no hay ficha; y responde 422/400/404 a errores;
-   - la auditoría tiene 7 días, no hay fuga de datos y los totales cuadran.
+   - la auditoría tiene 7 días, no hay fuga de datos y los totales cuadran;
+   - la predicción acepta festivo, evento en la plaza y época, y rechaza una época inexistente;
+   - el historial de compras por mes y por día: totales consistentes, días sin predicción, 404 y 422.
 
 Ejemplo con `curl`:
 
