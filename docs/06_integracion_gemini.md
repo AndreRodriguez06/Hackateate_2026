@@ -1,7 +1,7 @@
 # 06 · Integración de Google Gemini (sin chatbots)
 
 > **Apartado 6 · Orden 3.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado sin llave (`tests/test_gemini_service.py`, 19 pruebas; total del repositorio, 55).
+> Estado: ✅ implementado y probado sin llave (`tests/test_gemini_service.py`, 20 pruebas; total del repositorio, 56).
 > ⏳ **Pendiente:** probar con una `GEMINI_API_KEY` válida. Ver la sección 9.
 
 > ⚠️ Gemini trabaja sobre datos **SIMULADOS** (inventario, menú y precios del Apartado 2). La interfaz siempre indica si un resultado viene de Gemini o del modo respaldo.
@@ -21,18 +21,18 @@ No hay caja de chat ni conversación: el usuario pulsa un botón y recibe una pr
 
 | Medio | Uso |
 |---|---|
-| SDK oficial `google-genai` 3.6.1 (`from google import genai`) | Cliente de la API de Gemini. |
+| SDK oficial `google-genai` 1.33.0 (`from google import genai`; compatible con Python 3.10+) | Cliente de la API de Gemini. |
 | Modelo `gemini-2.5-flash` | Rápido y económico para tareas cortas; cambiable con `GEMINI_MODEL`. |
 | Structured Outputs: `response_mime_type="application/json"` + `response_schema=<modelo Pydantic>` | La respuesta llega como JSON que cumple el esquema. |
 | Pydantic | Define los esquemas y valida la respuesta. |
 | `backend/gemini_service.py` | Las dos funciones, validaciones y modo respaldo. |
-| `tests/test_gemini_service.py` | 19 pruebas con respuestas simuladas del modelo, sin red. |
+| `tests/test_gemini_service.py` | 20 pruebas con respuestas simuladas del modelo, sin red. |
 
 ## 3. Configuración
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env        # y pegar la llave de Google AI Studio en GEMINI_API_KEY
+cp .env.example .env        # y cambiar tu_api_key_aqui por la llave de Google AI Studio
 python backend/main.py
 ```
 
@@ -261,13 +261,13 @@ El tiempo máximo de espera (15 s) evita que la demo se congele si la red es len
 **Sin llave (lo que ya se probó):**
 
 ```bash
-python -m unittest discover -s tests -v     # 55 pruebas, 19 de Gemini
+python -m unittest discover -s tests -v     # 56 pruebas, 20 de Gemini
 python backend/gemini_service.py            # imprime promociones y ficha en modo respaldo
 ```
 
-Las 19 pruebas de Gemini comprueban:
+Las 20 pruebas de Gemini comprueban:
 - candidatos correctos;
-- respaldo sin llave;
+- respaldo sin llave, y también con la llave de ejemplo `tu_api_key_aqui`;
 - respuesta válida aceptada;
 - rechazo de: platillo inventado, platillo sin insumo crítico, descuento no rentable, precio equivocado en el texto y platillo repetido;
 - falla de red;

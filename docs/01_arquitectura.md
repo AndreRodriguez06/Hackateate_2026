@@ -105,8 +105,8 @@ Las rutas marcadas con ✅ ya existen. Las demás se crean en el apartado indica
 
 ```text
 Hackateate_2026/
-├── README.md                      ✅ (versión final en Apartado 7)
-├── requirements.txt               ✅ (se amplía en Apartado 4)
+├── README.md                      ✅ Apartado 7 · README maestro
+├── requirements.txt               ✅ Apartado 7 · versiones probadas en Python 3.10 y 3.13
 ├── .env.example                   ✅ Apartado 6  (GEMINI_API_KEY=...)
 ├── .gitignore                     ✅
 ├── data/
@@ -129,7 +129,8 @@ Hackateate_2026/
 │   ├── app.js                     ✅ Apartado 5 · consume /api/* con respaldo local
 │   └── datos_demo.js              ✅ Apartado 5 · respuestas precalculadas (modo demo autónoma)
 ├── scripts/
-│   └── exportar_datos_demo.py     ✅ Apartado 5 · genera frontend/datos_demo.js
+│   ├── exportar_datos_demo.py     ✅ Apartado 5 · genera frontend/datos_demo.js
+│   └── prueba_humo.py             ✅ Apartado 7 · prueba de punta a punta por HTTP
 ├── prueba1/                       ✅ prototipo visual 100 % en navegador (referencia de diseño)
 ├── tests/
 │   ├── test_generar_datos.py      ✅ Apartado 2
@@ -143,8 +144,8 @@ Hackateate_2026/
     ├── 04_backend_api.md          ✅ Apartado 4
     ├── 05_frontend_ux.md          ✅ Apartado 5
     ├── 06_integracion_gemini.md   ✅ Apartado 6
-    ├── 07_integracion_e2e.md      Apartado 7
-    └── 08_plan_de_negocios.md     Apartado 8
+    ├── 07_integracion_pruebas.md  ✅ Apartado 7
+    └── 08_plan_negocios.md        Apartado 8
 ```
 
 ## 6. Contratos de la API

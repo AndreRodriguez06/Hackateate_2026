@@ -1,7 +1,7 @@
 # 04 · Backend y API REST (FastAPI)
 
 > **Apartado 4 · Orden 2.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_api.py`, 17 pruebas). Total del repositorio: 55 pruebas.
+> Estado: ✅ implementado y probado (`tests/test_api.py`, 17 pruebas). Total del repositorio: 56 pruebas.
 
 > ⚠️ **Todas las respuestas provienen de datos SIMULADOS.** Cada respuesta incluye `es_simulado: true`, y los lotes del inventario lo indican uno por uno.
 
@@ -338,7 +338,7 @@ Cómo se calcula:
 
 1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 8 endpoints.
 2. En `/docs`, probar `POST /api/predecir` con margen `0.02`: `riesgo_desabasto: true`.
-3. `python -m unittest discover -s tests -v`: 55 pruebas. Las 17 de la API comprueban:
+3. `python -m unittest discover -s tests -v`: 56 pruebas. Las 17 de la API comprueban:
    - el arranque genera datos y modelo;
    - el inventario está ordenado y con el semáforo correcto, y el filtro por estado funciona;
    - la predicción cumple la fórmula, alerta el desabasto y responde 422/400 a entradas inválidas;
