@@ -125,8 +125,11 @@ Hackateate_2026/
 │       ├── alerta_excedente.py    ✅ Apartado 4 · proyección y ficha de rescate
 │       └── gemini_service.py      Apartado 6 · llamadas con response_schema
 ├── frontend/
-│   ├── index.html                 Apartado 5 · evolución de prueba1/
-│   └── app.js                     Apartado 5 · consume /api/*
+│   ├── index.html                 ✅ Apartado 5 · 4 vistas
+│   ├── app.js                     ✅ Apartado 5 · consume /api/* con respaldo local
+│   └── datos_demo.js              ✅ Apartado 5 · respuestas precalculadas (modo demo autónoma)
+├── scripts/
+│   └── exportar_datos_demo.py     ✅ Apartado 5 · genera frontend/datos_demo.js
 ├── prueba1/                       ✅ prototipo visual 100 % en navegador (referencia de diseño)
 ├── tests/
 │   ├── test_generar_datos.py      ✅ Apartado 2
@@ -137,7 +140,7 @@ Hackateate_2026/
     ├── 02_base_de_datos.md        ✅
     ├── 03_modelo_ml.md            ✅ Apartado 3
     ├── 04_backend_api.md          ✅ Apartado 4
-    ├── 05_frontend.md             Apartado 5
+    ├── 05_frontend_ux.md          ✅ Apartado 5
     ├── 06_integracion_gemini.md   Apartado 6
     ├── 07_integracion_e2e.md      Apartado 7
     └── 08_plan_de_negocios.md     Apartado 8

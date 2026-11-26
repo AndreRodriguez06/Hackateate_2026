@@ -83,8 +83,13 @@ def mensaje_por_plantilla(ficha: dict) -> str:
 
 def evaluar(con: sqlite3.Connection, ahora: datetime, platillo_clave: str, hora_actual: str,
             ritmo: str = "normal", porciones_preparadas: int | None = None,
-            porciones_vendidas: int | None = None, usar_gemini: bool = True) -> dict:
-    """Proyección de cierre y, si aplica, ficha de rescate temprano."""
+            porciones_vendidas: int | None = None, usar_gemini: bool = True,
+            generar_ficha: bool = True) -> dict:
+    """
+    Proyección de cierre y, si aplica, ficha de rescate temprano.
+    Con generar_ficha=False solo proyecta (no llama a Gemini ni escribe en la bitácora);
+    el frontend lo usa mientras el usuario mueve el slider de hora.
+    """
     h = hora_a_decimal(hora_actual)
     if not APERTURA <= h < CIERRE:
         raise ValueError(f"La hora debe estar dentro del servicio ({decimal_a_hora(APERTURA)} a "
@@ -138,7 +143,7 @@ def evaluar(con: sqlite3.Connection, ahora: datetime, platillo_clave: str, hora_
         "ficha": None,
         "origen_dato": db.origen_dataset(con),
     }
-    if not respuesta["alerta_activa"]:
+    if not respuesta["alerta_activa"] or not generar_ficha:
         return respuesta
 
     inicio, fin = ventana_recoleccion(h)

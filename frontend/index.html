@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroMerma AI</title>
+  <meta name="description" content="ZeroMerma AI: control operativo de cocina para reducir la merma de alimentos. Datos SIMULADOS." />
+
+  <!-- Dependencias vía CDN, versiones fijas (sin instalación ni compilación) -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f8fafc; color: #0f172a; }
+    .tab-btn[aria-selected="true"] { background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+    input[type="range"] { accent-color: #059669; }
+    input[type="range"].ambar { accent-color: #f59e0b; }
+    .tabular { font-variant-numeric: tabular-nums; }
+    .fade-in { animation: fadeIn .3s ease-out both; }
+    @keyframes fadeIn { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .toast-in { animation: toastIn .25s ease-out both; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    details > summary::-webkit-details-marker { display: none; }
+    details[open] .chev { transform: rotate(180deg); }
+    :focus-visible { outline: 2px solid #059669; outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- ============================ BARRA SUPERIOR FIJA ============================ -->
+  <header class="sticky top-0 z-40 bg-slate-900 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-col lg:flex-row lg:items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="h-10 w-10 shrink-0 rounded-xl bg-emerald-600 grid place-items-center" aria-hidden="true">
+          <i data-lucide="leaf" class="w-5 h-5"></i>
+        </div>
+        <div class="min-w-0">
+          <h1 class="font-semibold text-base sm:text-lg leading-tight">
+            ZeroMerma AI <span class="block sm:inline text-slate-400 font-normal text-sm sm:text-lg"><span class="hidden sm:inline">| </span>Control Operativo de Cocina</span>
+          </h1>
+          <div class="flex flex-wrap items-center gap-2 mt-1">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/40 text-xs font-medium">
+              ⚠️ Entorno de Validación: Datos Simulados
+            </span>
+            <button id="estadoConexion" type="button" title="Estado de la conexión con el servidor"
+              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-slate-600 text-slate-300">
+              <span class="h-2 w-2 rounded-full bg-slate-400"></span><span>Conectando…</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:ml-auto flex items-center gap-2 w-full lg:w-auto">
+        <label for="escenario" class="text-xs text-slate-400 whitespace-nowrap flex items-center gap-1">
+          <i data-lucide="calendar-range" class="w-4 h-4"></i> Escenario
+        </label>
+        <select id="escenario" class="w-full lg:w-[22rem] bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <option value="quincena">Viernes de Quincena + Lluvia (Alta demanda)</option>
+          <option value="martes" selected>Martes Regular (Demanda estándar)</option>
+          <option value="baja">Lunes en Vacaciones (Baja afluencia)</option>
+          <option value="personalizado" hidden>Personalizado</option>
+        </select>
+      </div>
+    </div>
+
+    <nav class="bg-slate-800/60 border-t border-slate-800" aria-label="Vistas">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div role="tablist" class="flex gap-1 overflow-x-auto no-scrollbar py-2">
+          <button role="tab" data-tab="planeador" aria-selected="true" class="tab-btn whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center gap-2">
+            <i data-lucide="shopping-cart" class="w-4 h-4"></i> 1. Planeador de Compras (ML)</button>
+          <button role="tab" data-tab="rescate" aria-selected="false" class="tab-btn whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-4 h-4"></i> 2. Rescate Rentable en Menú (Gemini)</button>
+          <button role="tab" data-tab="alerta" aria-selected="false" class="tab-btn whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center gap-2">
+            <i data-lucide="bell-ring" class="w-4 h-4"></i> 3. Alerta Temprana de Excedentes</button>
+          <button role="tab" data-tab="auditoria" aria-selected="false" class="tab-btn whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center gap-2">
+            <i data-lucide="history" class="w-4 h-4"></i> 4. Auditoría y Backtesting</button>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <div id="bannerDemo" class="hidden bg-amber-50 border-b border-amber-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 text-xs sm:text-sm text-amber-900 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span class="font-semibold">Modo demo autónoma:</span>
+      <span id="bannerDemoTexto">No hay servidor. Se muestran respuestas precalculadas del mismo modelo y reglas (datos SIMULADOS).</span>
+      <button id="reintentarConexion" type="button" class="underline font-medium">Reintentar conexión</button>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ============================ VISTA 1 · PLANEADOR ============================ -->
+    <section id="vista-planeador" data-vista class="fade-in">
+      <div class="mb-5">
+        <h2 class="text-xl sm:text-2xl font-semibold">Planeador de Compras</h2>
+        <p class="text-sm text-slate-500">¿Cuánto comprar hoy? Predicción del modelo Random Forest con un margen de seguridad que tú decides.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <aside class="lg:col-span-4 space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-6">
+            <h3 class="font-semibold flex items-center gap-2"><i data-lucide="sliders-horizontal" class="w-4 h-4 text-emerald-600"></i> Variables de entrada</h3>
+
+            <div>
+              <label for="insumo" class="text-sm font-medium text-slate-700 mb-2 block">Insumo</label>
+              <select id="insumo" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label for="margen" class="text-sm font-medium text-slate-700">Margen de seguridad</label>
+                <span id="margenEtiqueta" class="tabular text-sm font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700">8%</span>
+              </div>
+              <input id="margen" type="range" min="0" max="25" step="1" value="8" class="w-full" />
+              <div class="flex justify-between text-xs text-slate-400 mt-1"><span>0%</span><span>25%</span></div>
+              <p id="margenRecomendado" class="mt-2 text-xs text-slate-500"></p>
+            </div>
+
+            <div>
+              <label for="dia" class="text-sm font-medium text-slate-700 mb-2 block">Día a planear</label>
+              <select id="dia" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="0">Lunes</option><option value="1">Martes</option><option value="2">Miércoles</option>
+                <option value="3">Jueves</option><option value="4">Viernes</option><option value="5">Sábado</option><option value="6">Domingo</option>
+              </select>
+            </div>
+
+            <fieldset>
+              <legend class="text-sm font-medium text-slate-700 mb-2">Contexto del día</legend>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
+                <label class="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                  <input id="quincena" type="checkbox" class="h-4 w-4 accent-emerald-600" /><i data-lucide="wallet" class="w-4 h-4 text-slate-500"></i><span class="text-sm">Es día de quincena</span></label>
+                <label class="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                  <input id="lluvia" type="checkbox" class="h-4 w-4 accent-emerald-600" /><i data-lucide="cloud-rain" class="w-4 h-4 text-slate-500"></i><span class="text-sm">Pronóstico de lluvia</span></label>
+                <label class="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                  <input id="evento" type="checkbox" class="h-4 w-4 accent-emerald-600" /><i data-lucide="graduation-cap" class="w-4 h-4 text-slate-500"></i><span class="text-sm">Evento cercano</span></label>
+                <label class="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                  <input id="vacaciones" type="checkbox" class="h-4 w-4 accent-emerald-600" /><i data-lucide="sun" class="w-4 h-4 text-slate-500"></i><span class="text-sm">Vacaciones escolares</span></label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="bg-slate-900 text-slate-300 rounded-2xl p-4 text-xs leading-relaxed">
+            <p class="flex items-center gap-2 text-white font-medium mb-1"><i data-lucide="info" class="w-4 h-4 text-emerald-400"></i> Cómo se calcula</p>
+            <p><span class="text-white">Compra sugerida</span> = Demanda predicha × (1 + Margen).</p>
+            <p><span class="text-white">Merma evitada</span> = sobrante de la compra habitual menos sobrante de la sugerida, por la fracción que caduca según la vida útil del insumo.</p>
+          </div>
+        </aside>
+
+        <div class="lg:col-span-8 space-y-4 min-w-0">
+          <div id="bannerDesabasto" class="hidden rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-rose-50 p-4 flex gap-3 items-start" role="alert">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600 shrink-0 mt-0.5"></i>
+            <p class="text-sm text-rose-800"><strong>⚠️ Riesgo alto de desabasto (Stockout):</strong> con un margen menor a 4 % la compra puede quedarse corta y dejar platillos sin servicio en hora pico.</p>
+          </div>
+          <div id="errorPlaneador" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" role="alert"></div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" aria-live="polite">
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Clientes estimados</span><i data-lucide="users" class="w-4 h-4"></i></div>
+              <p id="kpiClientes" class="tabular text-2xl font-semibold mt-2">—</p>
+              <p id="kpiClientesSub" class="text-xs text-slate-500 mt-1">Comensales en el día</p>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Compra sugerida</span><i data-lucide="package-check" class="w-4 h-4"></i></div>
+              <p id="kpiCompra" class="tabular text-2xl font-semibold mt-2">—</p>
+              <p id="kpiCompraSub" class="text-xs text-slate-500 mt-1"></p>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Costo estimado</span><i data-lucide="banknote" class="w-4 h-4"></i></div>
+              <p id="kpiCosto" class="tabular text-2xl font-semibold mt-2">—</p>
+              <p id="kpiCostoSub" class="text-xs text-slate-500 mt-1"></p>
+            </div>
+            <div class="bg-emerald-600 text-white rounded-2xl p-4 shadow-sm">
+              <div class="flex items-center justify-between text-emerald-100 text-xs font-medium"><span>Merma evitada vs. compra habitual</span><i data-lucide="recycle" class="w-4 h-4"></i></div>
+              <p id="kpiMerma" class="tabular text-2xl font-semibold mt-2">—</p>
+              <p id="kpiMermaSub" class="text-xs text-emerald-100 mt-1"></p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-1 mb-3">
+              <div>
+                <h3 class="font-semibold">¿Por qué el modelo sugiere esta cantidad? (Importancia de Variables)</h3>
+                <p class="text-xs text-slate-500">Cuánto aporta cada variable a las predicciones del modelo (importancia global del Random Forest).</p>
+              </div>
+              <span id="fuentePlaneador" class="text-xs text-slate-500 flex items-center gap-1 shrink-0"></span>
+            </div>
+            <div class="relative h-64"><canvas id="graficaImportancia" aria-label="Gráfica de importancia de variables" role="img"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ VISTA 2 · RESCATE ============================ -->
+    <section id="vista-rescate" data-vista class="hidden fade-in">
+      <div class="mb-5">
+        <h2 class="text-xl sm:text-2xl font-semibold">Rescate Rentable en Menú</h2>
+        <p class="text-sm text-slate-500">Insumos a punto de caducar → promociones en platillos que ya están en tu menú, sin vender por debajo del costo.</p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
+          <h3 class="font-semibold flex items-center gap-2"><i data-lucide="warehouse" class="w-4 h-4 text-slate-500"></i> Inventario por caducar</h3>
+          <div class="flex items-center gap-2 text-xs">
+            <span id="resumenInventario" class="text-slate-500"></span>
+            <button id="verTodoInventario" type="button" class="px-2.5 py-1 rounded-md border border-slate-300 hover:bg-slate-50 font-medium">Ver todo</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm min-w-[560px]">
+            <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+              <tr>
+                <th class="text-left font-medium px-5 py-3">Insumo</th>
+                <th class="text-right font-medium px-5 py-3">Disponible</th>
+                <th class="text-left font-medium px-5 py-3">Caduca en</th>
+                <th class="text-left font-medium px-5 py-3">Estado</th>
+                <th class="text-right font-medium px-5 py-3">Valor</th>
+              </tr>
+            </thead>
+            <tbody id="tablaInventario" class="divide-y divide-slate-100"><tr><td colspan="5" class="px-5 py-6 text-center text-slate-400">Cargando inventario…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="my-6 flex flex-col items-center gap-2">
+        <button id="botonOptimizar" type="button" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-semibold shadow-lg shadow-emerald-600/20 hover:from-emerald-700 hover:to-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-300 transition disabled:opacity-60 disabled:cursor-wait">
+          <i data-lucide="sparkles" class="w-5 h-5"></i> ✨ Optimizar Menú con Gemini
+        </button>
+        <p class="text-xs text-slate-500">Usa los insumos vigentes que caducan en menos de 24 h.</p>
+      </div>
+
+      <div id="cargandoOptimizar" class="hidden flex flex-col items-center gap-3 py-10" role="status">
+        <div class="h-10 w-10 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin"></div>
+        <p class="text-sm text-slate-600">Analizando recetario, costos e inventario crítico…</p>
+      </div>
+      <div id="errorRescate" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 mb-4" role="alert"></div>
+
+      <div id="resultadoOptimizar" class="hidden space-y-4">
+        <div id="modoOptimizar"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7 space-y-4 min-w-0">
+            <h3 class="font-semibold flex items-center gap-2"><i data-lucide="megaphone" class="w-4 h-4 text-emerald-600"></i> Estrategias de promoción</h3>
+            <div id="tarjetasEstrategia" class="space-y-4"></div>
+          </div>
+          <div class="lg:col-span-5">
+            <h3 class="font-semibold flex items-center gap-2 mb-4"><i data-lucide="smartphone" class="w-4 h-4 text-emerald-600"></i> Vista previa del menú digital (comensal)</h3>
+            <div class="mx-auto w-full max-w-[300px] rounded-[2.5rem] bg-slate-900 p-3 shadow-2xl">
+              <div class="rounded-[2rem] bg-white overflow-hidden h-[560px] flex flex-col">
+                <div class="relative bg-slate-900 text-white px-5 pt-6 pb-4">
+                  <div class="absolute top-2 left-1/2 -translate-x-1/2 h-1.5 w-16 rounded-full bg-slate-700"></div>
+                  <p class="text-[10px] uppercase tracking-widest text-emerald-400">Menú QR · Vista previa</p>
+                  <p class="font-semibold text-lg leading-tight">Cafetería La Esquina</p>
+                  <p class="text-xs text-slate-400">Abierto hasta las 8:00 PM</p>
+                </div>
+                <div id="menuTelefono" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"></div>
+              </div>
+            </div>
+            <p class="text-center text-xs text-slate-400 mt-2">Restaurante y menú ficticios (SIMULADO).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ VISTA 3 · ALERTA ============================ -->
+    <section id="vista-alerta" data-vista class="hidden fade-in">
+      <div class="mb-5">
+        <h2 class="text-xl sm:text-2xl font-semibold">Alerta Temprana de Excedentes</h2>
+        <p class="text-sm text-slate-500">A media jornada: ¿sobrará comida al cierre (8:00 PM)? Si sí, avisa a tiempo a un comedor comunitario o a la red del campus.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <aside class="lg:col-span-4 space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-6">
+            <h3 class="font-semibold flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-amber-500"></i> Simulador de avance del día</h3>
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label for="hora" class="text-sm font-medium text-slate-700">Hora del día</label>
+                <span id="horaEtiqueta" class="tabular text-sm font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700">3:00 PM</span>
+              </div>
+              <input id="hora" type="range" min="12" max="19" step="0.5" value="15" class="w-full ambar" />
+              <div class="flex justify-between text-xs text-slate-400 mt-1"><span>12:00 PM</span><span>7:00 PM</span></div>
+            </div>
+            <div>
+              <label for="ritmo" class="text-sm font-medium text-slate-700 mb-2 block">Ritmo de ventas</label>
+              <select id="ritmo" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <option value="lento">Ventas Lentas (−30 %)</option>
+                <option value="normal" selected>Ventas Normales</option>
+                <option value="rapido">Ventas Rápidas (+15 %)</option>
+              </select>
+            </div>
+            <div>
+              <label for="platilloAlerta" class="text-sm font-medium text-slate-700 mb-2 block">Platillo a monitorear</label>
+              <select id="platilloAlerta" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"></select>
+            </div>
+            <div>
+              <label for="preparadas" class="text-sm font-medium text-slate-700 mb-2 block">Porciones preparadas hoy</label>
+              <input id="preparadas" type="number" min="0" max="500" inputmode="numeric" placeholder="Automático (historial + 10 %)"
+                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <h4 id="tituloAvance" class="text-sm font-medium text-slate-700 mb-3">Avance de ventas</h4>
+            <div class="flex justify-between text-xs text-slate-500 mb-1"><span>Vendidas</span><span id="vendidasEtiqueta" class="tabular">—</span></div>
+            <div class="h-3 rounded-full bg-slate-100 overflow-hidden"><div id="barraVendidas" class="h-full bg-emerald-600 transition-all duration-500" style="width:0%"></div></div>
+            <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+              <div class="rounded-lg bg-slate-50 p-2"><p class="text-[11px] text-slate-500">Preparadas</p><p id="preparadasEtiqueta" class="tabular font-semibold">—</p></div>
+              <div class="rounded-lg bg-slate-50 p-2"><p class="text-[11px] text-slate-500">Venta al cierre</p><p id="cierreEtiqueta" class="tabular font-semibold">—</p></div>
+              <div class="rounded-lg bg-slate-50 p-2"><p class="text-[11px] text-slate-500">Sobrante</p><p id="sobranteEtiqueta" class="tabular font-semibold">—</p></div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="lg:col-span-8 space-y-4 min-w-0">
+          <div id="estadoAlerta" aria-live="polite"></div>
+          <div id="errorAlerta" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" role="alert"></div>
+          <div id="panelDespacho" class="hidden"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ VISTA 4 · AUDITORÍA ============================ -->
+    <section id="vista-auditoria" data-vista class="hidden fade-in">
+      <div class="mb-5 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-semibold">Auditoría y "Máquina del Tiempo"</h2>
+          <p id="periodoAuditoria" class="text-sm text-slate-500">Backtesting: ¿qué habría pasado en los últimos 7 días si se hubiera comprado con ZeroMerma AI?</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <label for="insumoAuditoria" class="text-sm text-slate-600 whitespace-nowrap">Gráfica de</label>
+          <select id="insumoAuditoria" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+        </div>
+      </div>
+
+      <div id="errorAuditoria" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 mb-4" role="alert"></div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Reducción relativa de merma</span><i data-lucide="trending-down" class="w-4 h-4 text-emerald-600"></i></div>
+          <p id="audReduccion" class="tabular text-3xl font-semibold mt-2 text-emerald-600">—</p>
+          <p class="text-xs text-slate-500 mt-1">vs. compra tradicional, mismos días</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Merma evitada</span><i data-lucide="scale" class="w-4 h-4 text-emerald-600"></i></div>
+          <p id="audKg" class="tabular text-3xl font-semibold mt-2">—</p>
+          <p class="text-xs text-slate-500 mt-1">insumos medidos en kg</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Merma evitada en dinero</span><i data-lucide="piggy-bank" class="w-4 h-4 text-emerald-600"></i></div>
+          <p id="audMxn" class="tabular text-3xl font-semibold mt-2">—</p>
+          <p class="text-xs text-slate-500 mt-1">46 insumos, precios SIMULADOS</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Demanda no cubierta</span><i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i></div>
+          <p id="audCobertura" class="tabular text-3xl font-semibold mt-2">—</p>
+          <p id="audCoberturaSub" class="text-xs text-slate-500 mt-1"></p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-6">
+        <div class="mb-3">
+          <h3 id="tituloGraficaAuditoria" class="font-semibold">Comparativa diaria</h3>
+          <p class="text-xs text-slate-500">La distancia entre la compra y la demanda real es sobrante (merma potencial) o faltante.</p>
+        </div>
+        <div class="relative h-72 sm:h-80"><canvas id="graficaAuditoria" aria-label="Gráfica comparativa de compras y demanda" role="img"></canvas></div>
+      </div>
+
+      <details class="group bg-white rounded-2xl border border-slate-200 shadow-sm">
+        <summary class="cursor-pointer list-none px-5 py-4 flex items-center justify-between gap-3">
+          <span class="font-semibold flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4 text-slate-500"></i> Fuentes, Supuestos y Metodología</span>
+          <i data-lucide="chevron-down" class="chev w-5 h-5 text-slate-400 transition-transform"></i>
+        </summary>
+        <div class="px-5 pb-5 text-sm text-slate-600 space-y-3 border-t border-slate-100 pt-4">
+          <div class="flex gap-3 rounded-lg bg-amber-50 border border-amber-200 p-3"><i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 text-amber-600 shrink-0"></i>
+            <p class="text-amber-900"><strong>Declaración:</strong> todos los registros (ventas, afluencia, clima, inventario, recetas y precios) son <strong>SIMULADOS</strong> para validar el prototipo. No representan las operaciones de ningún establecimiento real.</p></div>
+          <div class="flex gap-3"><i data-lucide="tag" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
+            <p><strong class="text-slate-800">Precios de insumos:</strong> valores SIMULADOS provisionales. La fuente de referencia prevista es <em>Quién es Quién en los Precios</em> de PROFECO; la sustitución por precios consultados está pendiente y documentada en <code>docs/02_base_de_datos.md</code>.</p></div>
+          <div class="flex gap-3"><i data-lucide="globe" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
+            <p><strong class="text-slate-800">Contexto del problema:</strong> el desperdicio de alimentos en servicios de comida está documentado por la FAO y el PNUMA (Programa de la ONU para el Medio Ambiente, <em>Food Waste Index Report</em>). Las cifras citadas se presentan con su fuente en el plan de negocios (Apartado 8).</p></div>
+          <div class="flex gap-3"><i data-lucide="flask-conical" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
+            <div><p><strong class="text-slate-800">Metodología:</strong> <span id="metodologiaAuditoria">el modelo se reentrena solo con los días anteriores al periodo evaluado, para no "ver el futuro".</span></p>
+              <ul class="list-disc ml-5 mt-1 space-y-0.5">
+                <li>Compra tradicional: lo que se compró "a ojo" (día más fuerte de la semana anterior más un colchón).</li>
+                <li>Compra ZeroMerma: predicción × (1 + margen recomendado del insumo).</li>
+                <li>Merma: sobrante × fracción que caduca según la vida útil del insumo.</li>
+              </ul></div></div>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <footer class="max-w-7xl mx-auto px-4 sm:px-6 pb-8 text-xs text-slate-400">
+    ZeroMerma AI · Prototipo de validación · Todos los datos son SIMULADOS.
+  </footer>
+
+  <div id="toasts" class="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-6 z-50 flex flex-col gap-2 items-stretch sm:items-end" aria-live="polite"></div>
+
+  <!-- Respaldo para el modo demo autónoma (generado por scripts/exportar_datos_demo.py) -->
+  <script src="datos_demo.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

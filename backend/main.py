@@ -195,6 +195,7 @@ class AlertaEntrada(BaseModel):
     porciones_preparadas: int | None = Field(None, ge=0, description="Si se omite, se estima del historial.")
     porciones_vendidas: int | None = Field(None, ge=0, description="Si se da, el ritmo se mide con este dato.")
     usar_gemini: bool = True
+    generar_ficha: bool = Field(True, description="False: solo proyecta, sin ficha ni registro en bitácora.")
 
     @field_validator("hora_actual")
     @classmethod
@@ -398,7 +399,8 @@ def alerta_excedente_endpoint(entrada: AlertaEntrada):
         with conexion() as con:
             r = alerta_excedente.evaluar(con, ahora(), entrada.platillo, entrada.hora_actual,
                                          entrada.ritmo_ventas, entrada.porciones_preparadas,
-                                         entrada.porciones_vendidas, entrada.usar_gemini)
+                                         entrada.porciones_vendidas, entrada.usar_gemini,
+                                         entrada.generar_ficha)
     except KeyError as err:
         raise HTTPException(status_code=404, detail=f"Platillo no encontrado: {err.args[0]}") from err
     except ValueError as err:

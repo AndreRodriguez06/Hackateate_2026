@@ -137,6 +137,13 @@ class TestAPI(unittest.TestCase):
         enviada = self.cliente.post(f"/api/alerta-excedente/{d['alerta_id']}/enviar").json()
         self.assertTrue(enviada["envio_simulado"])
 
+    def test_alerta_solo_proyeccion_no_registra(self):
+        d = self.cliente.post("/api/alerta-excedente", json={"hora_actual": "15:00", "ritmo_ventas": "lento",
+                                                              "porciones_preparadas": 40, "generar_ficha": False}).json()
+        self.assertTrue(d["alerta_activa"])
+        self.assertIsNone(d["ficha"])
+        self.assertIsNone(d["alerta_id"])
+
     def test_alerta_sin_sobrante_no_genera_ficha(self):
         d = self.cliente.post("/api/alerta-excedente", json={"hora_actual": "15:00", "ritmo_ventas": "rapido",
                                                               "porciones_preparadas": 1}).json()

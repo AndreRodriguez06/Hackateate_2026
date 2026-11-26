@@ -12,7 +12,7 @@ Plataforma web para reducir el desperdicio de alimentos en un restaurante de pla
 | 2. Base de datos y datos simulados | ✅ | [`docs/02_base_de_datos.md`](docs/02_base_de_datos.md) |
 | 3. Modelo predictivo (Random Forest) | ✅ | [`docs/03_modelo_ml.md`](docs/03_modelo_ml.md) |
 | 4. Backend y API REST (FastAPI) | ✅ | [`docs/04_backend_api.md`](docs/04_backend_api.md) |
-| 5. Frontend | Prototipo visual en [`prueba1/`](prueba1/) | |
+| 5. Interfaz web (frontend) | ✅ | [`docs/05_frontend_ux.md`](docs/05_frontend_ux.md) |
 | 6. Integración Gemini | Pendiente | |
 | 7. Integración final | Pendiente | |
 | 8. Plan de negocios | Pendiente | |
@@ -23,7 +23,7 @@ Requiere Python 3.10 o superior.
 
 ```bash
 pip install -r requirements.txt
-python backend/main.py        # genera datos y modelo si faltan, y abre la API en http://localhost:8000
+python backend/main.py        # genera datos y modelo si faltan → abre http://localhost:8000
 ```
 
 Documentación interactiva de la API: <http://localhost:8000/docs>.
@@ -33,7 +33,9 @@ Otros comandos útiles:
 ```bash
 python data/generar_datos.py              # regenera data/restaurante.db (datos SIMULADOS)
 python ml/modelo_demanda.py entrenar      # reentrena e imprime las métricas
-python -m unittest discover -s tests -v   # 33 pruebas
+python -m unittest discover -s tests -v   # 34 pruebas
 ```
 
-El prototipo visual se abre con doble clic en `prueba1/index.html`.
+Sin servidor: doble clic en `frontend/index.html` abre la aplicación en **modo demo autónoma** (respuestas precalculadas del mismo modelo; se regeneran con `python scripts/exportar_datos_demo.py`).
+
+`prueba1/` es el primer prototipo visual (100 % en el navegador, cifras ilustrativas); se conserva como referencia.

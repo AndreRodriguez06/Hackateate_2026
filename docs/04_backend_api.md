@@ -1,7 +1,7 @@
 # 04 · Backend y API REST (FastAPI)
 
 > **Apartado 4 · Orden 2.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_api.py`, 14 pruebas). Total del repositorio: 33 pruebas.
+> Estado: ✅ implementado y probado (`tests/test_api.py`, 15 pruebas). Total del repositorio: 34 pruebas.
 
 > ⚠️ **Todas las respuestas provienen de datos SIMULADOS.** Cada respuesta incluye `es_simulado: true`, y los lotes del inventario lo indican uno por uno.
 
@@ -231,6 +231,7 @@ Proyecta cuántas porciones sobrarán al cierre (20:00) y, si sobran **3 o más*
 | `porciones_preparadas` | entero ≥ 0 | estimado | Si se omite: venta promedio del día × 1.10. |
 | `porciones_vendidas` | entero ≥ 0 | — | Si se da, el ritmo se **mide** en lugar de elegirse. |
 | `usar_gemini` | bool | `true` | Para redactar el mensaje (Apartado 6). |
+| `generar_ficha` | bool | `true` | `false`: solo proyecta, sin ficha ni registro en bitácora (el frontend lo usa al mover el slider). |
 
 ```json
 { "hora_actual": "15:00", "ritmo_ventas": "lento" }
@@ -336,13 +337,13 @@ Cómo se calcula:
 
 1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 8 endpoints.
 2. En `/docs`, probar `POST /api/predecir` con margen `0.02`: `riesgo_desabasto: true`.
-3. `python -m unittest discover -s tests -v`: 33 pruebas. Las 14 de la API comprueban:
+3. `python -m unittest discover -s tests -v`: 34 pruebas. Las 15 de la API comprueban:
    - el arranque genera datos y modelo;
    - el inventario está ordenado y con el semáforo correcto, y el filtro por estado funciona;
    - la predicción cumple la fórmula, alerta el desabasto y responde 422/400 a entradas inválidas;
    - las promociones solo usan platillos del menú con insumos críticos y precio ≥ 1.5 × costo;
    - con un Gemini falso, la respuesta válida se acepta **con cifras recalculadas**, se rechaza un platillo inventado y se rechaza un descuento no rentable;
-   - la alerta con ventas lentas genera ficha (ventana 16:30–18:30) y se puede "enviar"; sin sobrante no hay ficha; y responde 422/400/404 a errores;
+   - la alerta con ventas lentas genera ficha (ventana 16:30–18:30) y se puede "enviar"; con `generar_ficha: false` solo proyecta sin registrar; sin sobrante no hay ficha; y responde 422/400/404 a errores;
    - la auditoría tiene 7 días, no hay fuga de datos y los totales cuadran.
 
 Ejemplo con `curl`:
