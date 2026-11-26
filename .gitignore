@@ -1,6 +1,7 @@
 # Base de datos y modelo generados (se recrean con scripts)
 data/*.db
-backend/ml/*.joblib
+ml/*.pkl
+ml/metricas.json
 
 # Secretos
 .env

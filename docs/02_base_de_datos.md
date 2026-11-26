@@ -28,7 +28,7 @@ Tener datos históricos suficientes y coherentes para:
 Desde la raíz del repositorio:
 
 ```bash
-python data/generar_datos.py                    # crea data/zeromerma.db (180 días, semilla 42)
+python data/generar_datos.py                    # crea data/restaurante.db (180 días, semilla 42)
 python data/generar_datos.py --solo-inventario  # justo antes de la demo: refresca las caducidades
 python -m unittest discover -s tests -v         # corre las pruebas
 ```
@@ -248,7 +248,7 @@ El semáforo **no se guarda**: el backend lo calcula al consultar, porque cambia
 | Semilla fija | Datos aleatorios en cada ejecución | Todo el equipo ve los mismos números y el modelo es reproducible. |
 | Caducidades relativas a "ahora" | Fechas fijas | En la demo siempre hay insumos a menos de 24 h. |
 | Simular el consumo desde ventas × recetas | Simular el consumo directamente | El consumo queda coherente con lo vendido y con el recetario que usa Gemini. |
-| `zeromerma.db` fuera de git | Subir el archivo | Se regenera en 1 segundo y evita conflictos de merge. |
+| `restaurante.db` fuera de git | Subir el archivo | Se regenera en 1 segundo y evita conflictos de merge. |
 
 ## 7. Evidencia: SIMULADO vs. REAL
 
@@ -283,7 +283,7 @@ Para cada insumo, consultar en PROFECO *Quién es Quién en los Precios* y actua
 3. Consulta manual rápida:
 
 ```bash
-python -c "import sqlite3; c=sqlite3.connect('data/zeromerma.db'); print(c.execute('SELECT * FROM meta_dataset').fetchall())"
+python -c "import sqlite3; c=sqlite3.connect('data/restaurante.db'); print(c.execute('SELECT * FROM meta_dataset').fetchall())"
 ```
 
 ## 9. Preguntas probables de los jueces

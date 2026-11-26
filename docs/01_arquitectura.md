@@ -67,10 +67,10 @@ flowchart LR
 
     subgraph Servidor["Servidor local · uvicorn :8000"]
         API[FastAPI<br/>backend/main.py]
-        ML[Modelo de demanda<br/>Random Forest<br/>backend/ml/]
+        ML[Modelo de demanda<br/>Random Forest<br/>ml/modelo_demanda.py]
         GEM[Servicio Gemini<br/>backend/services/gemini_service.py]
         FB[Fallback local<br/>reglas deterministas]
-        DB[(SQLite<br/>data/zeromerma.db)]
+        DB[(SQLite<br/>data/restaurante.db)]
     end
 
     GAPI[[Google Gemini API]]
@@ -106,21 +106,21 @@ Las rutas marcadas con ✅ ya existen. Las demás se crean en el apartado indica
 ```text
 Hackateate_2026/
 ├── README.md                      ✅ (versión final en Apartado 7)
-├── requirements.txt               Apartado 4
+├── requirements.txt               ✅ (se amplía en Apartado 4)
 ├── .env.example                   Apartado 6  (GEMINI_API_KEY=...)
 ├── .gitignore                     ✅
 ├── data/
 │   ├── schema.sql                 ✅ Apartado 2 · esquema SQLite
 │   ├── generar_datos.py           ✅ Apartado 2 · generador SIMULADO
-│   └── zeromerma.db               (se genera; no se sube a git)
+│   └── restaurante.db             (se genera; no se sube a git)
+├── ml/
+│   ├── modelo_demanda.py          ✅ Apartado 3 · entrena, valida y predice compra
+│   ├── modelo_rf.pkl              (se genera; no se sube a git)
+│   └── metricas.json              (se genera; no se sube a git)
 ├── backend/
 │   ├── main.py                    Apartado 4 · app FastAPI + estáticos
 │   ├── database.py                Apartado 4 · conexión y consultas
 │   ├── schemas.py                 Apartado 4 · modelos Pydantic (entrada/salida)
-│   ├── ml/
-│   │   ├── entrenar.py            Apartado 3 · entrena y guarda el modelo
-│   │   ├── modelo_demanda.py      Apartado 3 · predicción, compra sugerida, stockout
-│   │   └── modelo_demanda.joblib  (se genera)
 │   └── services/
 │       ├── gemini_service.py      Apartado 6 · llamadas con response_schema
 │       └── fallback.py            Apartado 6 · respuestas locales sin IA
@@ -129,11 +129,12 @@ Hackateate_2026/
 │   └── app.js                     Apartado 5 · consume /api/*
 ├── prueba1/                       ✅ prototipo visual 100 % en navegador (referencia de diseño)
 ├── tests/
-│   └── test_generar_datos.py      ✅ Apartado 2
+│   ├── test_generar_datos.py      ✅ Apartado 2
+│   └── test_modelo_demanda.py     ✅ Apartado 3
 └── docs/
     ├── 01_arquitectura.md         ✅ este documento
     ├── 02_base_de_datos.md        ✅
-    ├── 03_modelo_predictivo.md    Apartado 3
+    ├── 03_modelo_ml.md            ✅ Apartado 3
     ├── 04_backend_api.md          Apartado 4
     ├── 05_frontend.md             Apartado 5
     ├── 06_integracion_gemini.md   Apartado 6

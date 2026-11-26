@@ -3,7 +3,7 @@
 ZeroMerma AI — Generador de datos históricos SIMULADOS
 Archivo: /data/generar_datos.py
 
-Crea la base de datos SQLite `data/zeromerma.db` a partir de `data/schema.sql`
+Crea la base de datos SQLite `data/restaurante.db` a partir de `data/schema.sql`
 y la llena con datos ficticios, pero coherentes, de un restaurante de plaza
 comercial en México:
 
@@ -40,7 +40,7 @@ ORIGEN = "SIMULADO"
 
 DIR_DATA = Path(__file__).resolve().parent
 RUTA_SCHEMA = DIR_DATA / "schema.sql"
-RUTA_DB_DEFAULT = DIR_DATA / "zeromerma.db"
+RUTA_DB_DEFAULT = DIR_DATA / "restaurante.db"
 
 FUENTE_PRECIO_PENDIENTE = (
     "SIMULADO - valor provisional. Reemplazar por el precio de PROFECO "
