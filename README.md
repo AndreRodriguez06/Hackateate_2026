@@ -11,7 +11,7 @@ Plataforma web para reducir el desperdicio de alimentos en un restaurante de pla
 | 1. Funciones y arquitectura | ✅ | [`docs/01_arquitectura.md`](docs/01_arquitectura.md) |
 | 2. Base de datos y datos simulados | ✅ | [`docs/02_base_de_datos.md`](docs/02_base_de_datos.md) |
 | 3. Modelo predictivo (Random Forest) | ✅ | [`docs/03_modelo_ml.md`](docs/03_modelo_ml.md) |
-| 4. Backend FastAPI | Pendiente | |
+| 4. Backend y API REST (FastAPI) | ✅ | [`docs/04_backend_api.md`](docs/04_backend_api.md) |
 | 5. Frontend | Prototipo visual en [`prueba1/`](prueba1/) | |
 | 6. Integración Gemini | Pendiente | |
 | 7. Integración final | Pendiente | |
@@ -23,10 +23,17 @@ Requiere Python 3.10 o superior.
 
 ```bash
 pip install -r requirements.txt
-python data/generar_datos.py              # crea data/restaurante.db con datos SIMULADOS
-python ml/modelo_demanda.py entrenar      # valida y guarda ml/modelo_rf.pkl
-python ml/modelo_demanda.py predecir --insumo pollo --dia 4 --quincena --margen 0.08
-python -m unittest discover -s tests -v   # 19 pruebas
+python backend/main.py        # genera datos y modelo si faltan, y abre la API en http://localhost:8000
+```
+
+Documentación interactiva de la API: <http://localhost:8000/docs>.
+
+Otros comandos útiles:
+
+```bash
+python data/generar_datos.py              # regenera data/restaurante.db (datos SIMULADOS)
+python ml/modelo_demanda.py entrenar      # reentrena e imprime las métricas
+python -m unittest discover -s tests -v   # 33 pruebas
 ```
 
 El prototipo visual se abre con doble clic en `prueba1/index.html`.

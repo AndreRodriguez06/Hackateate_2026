@@ -6,6 +6,7 @@ Solo usa la librería estándar.
 """
 import importlib.util
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from datetime import date
@@ -83,7 +84,7 @@ class TestGenerarDatos(unittest.TestCase):
     def test_reproducible_con_la_misma_semilla(self):
         otra = Path(self.tmp.name) / "otra.db"
         generar_datos.main(["--db", str(otra), "--fecha-fin", "2026-10-31", "--silencioso"])
-        with sqlite3.connect(otra) as con2:
+        with closing(sqlite3.connect(otra)) as con2:
             a = self.con.execute("SELECT * FROM contexto_diario ORDER BY fecha").fetchall()
             b = con2.execute("SELECT * FROM contexto_diario ORDER BY fecha").fetchall()
         self.assertEqual(a, b)

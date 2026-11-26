@@ -417,7 +417,55 @@ def predecir_compra(insumo: str, dia_semana: int, es_quincena: bool, lluvia: boo
 
 
 # =============================================================================
-# 5. LÍNEA DE COMANDOS
+# 5. BACKTESTING ("máquina del tiempo") PARA LA VISTA DE AUDITORÍA
+# =============================================================================
+
+def backtest(ultimos_dias: int = 7, margen: float | None = None, ruta_db: Path = RUTA_DB,
+             ruta_modelo: Path = RUTA_MODELO) -> dict:
+    """
+    ¿Qué habría pasado en los últimos `ultimos_dias` días cerrados si se hubiera comprado
+    con ZeroMerma AI?
+
+    Para no hacer trampa, entrena un modelo NUEVO solo con los días anteriores a ese
+    periodo (el modelo guardado ya los vio). Cada día se compra
+    predicción × (1 + margen); si `margen` es None se usa el margen recomendado de
+    cada insumo guardado en el modelo.
+
+    Devuelve arreglos por día × insumo con la compra tradicional, el consumo real y la
+    compra sugerida, más los datos de cada insumo.
+    """
+    datos = cargar_datos(ruta_db)
+    n = len(datos["X"])
+    if not 1 <= ultimos_dias <= n - 60:
+        raise ValueError(f"ultimos_dias debe estar entre 1 y {n - 60}")
+    corte = n - ultimos_dias
+
+    modelo = _nuevo_rf().fit(datos["X"][:corte], datos["Y"][:corte])
+    prediccion = np.maximum(modelo.predict(datos["X"][corte:])[:, 1:], 0)
+
+    claves = [i["clave"] for i in datos["insumos"]]
+    if margen is None:
+        recomendado = cargar_modelo(ruta_modelo)["margen_recomendado_p90"]
+        margenes = np.array([recomendado.get(c, 0.08) for c in claves])
+    else:
+        if not 0 <= margen <= MARGEN_MAXIMO:
+            raise ValueError(f"margen debe estar entre 0 y {MARGEN_MAXIMO}")
+        margenes = np.full(len(claves), margen)
+
+    return {
+        "fechas": datos["fechas"][corte:],
+        "insumos": datos["insumos"],
+        "compra_tradicional": datos["compra_tradicional"][corte:],
+        "consumo_real": datos["Y"][corte:, 1:],
+        "compra_sugerida": prediccion * (1 + margenes),
+        "margenes": margenes,
+        "entrenado_hasta": datos["fechas"][corte - 1],
+        "origen_dato": datos["origen_dato"],
+    }
+
+
+# =============================================================================
+# 6. LÍNEA DE COMANDOS
 # =============================================================================
 
 def main(argv: list[str] | None = None) -> int:

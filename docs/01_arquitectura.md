@@ -118,24 +118,25 @@ Hackateate_2026/
 │   ├── modelo_rf.pkl              (se genera; no se sube a git)
 │   └── metricas.json              (se genera; no se sube a git)
 ├── backend/
-│   ├── main.py                    Apartado 4 · app FastAPI + estáticos
-│   ├── database.py                Apartado 4 · conexión y consultas
-│   ├── schemas.py                 Apartado 4 · modelos Pydantic (entrada/salida)
+│   ├── main.py                    ✅ Apartado 4 · app FastAPI, modelos Pydantic, endpoints, estáticos
+│   ├── database.py                ✅ Apartado 4 · conexión y consultas
 │   └── services/
-│       ├── gemini_service.py      Apartado 6 · llamadas con response_schema
-│       └── fallback.py            Apartado 6 · respuestas locales sin IA
+│       ├── rescate_menu.py        ✅ Apartado 4 · promociones (reglas + validación de Gemini)
+│       ├── alerta_excedente.py    ✅ Apartado 4 · proyección y ficha de rescate
+│       └── gemini_service.py      Apartado 6 · llamadas con response_schema
 ├── frontend/
 │   ├── index.html                 Apartado 5 · evolución de prueba1/
 │   └── app.js                     Apartado 5 · consume /api/*
 ├── prueba1/                       ✅ prototipo visual 100 % en navegador (referencia de diseño)
 ├── tests/
 │   ├── test_generar_datos.py      ✅ Apartado 2
-│   └── test_modelo_demanda.py     ✅ Apartado 3
+│   ├── test_modelo_demanda.py     ✅ Apartado 3
+│   └── test_api.py                ✅ Apartado 4
 └── docs/
     ├── 01_arquitectura.md         ✅ este documento
     ├── 02_base_de_datos.md        ✅
     ├── 03_modelo_ml.md            ✅ Apartado 3
-    ├── 04_backend_api.md          Apartado 4
+    ├── 04_backend_api.md          ✅ Apartado 4
     ├── 05_frontend.md             Apartado 5
     ├── 06_integracion_gemini.md   Apartado 6
     ├── 07_integracion_e2e.md      Apartado 7
@@ -144,98 +145,20 @@ Hackateate_2026/
 
 ## 6. Contratos de la API
 
-Todas las respuestas incluyen `"origen_dato": "SIMULADO"` mientras la base de datos sea simulada. Las cantidades van en la unidad del insumo (`kg`, `L` o `pza`) y el dinero en pesos mexicanos.
+> La referencia completa y vigente de cada endpoint (parámetros, respuestas JSON reales y errores) está en **[`04_backend_api.md`](04_backend_api.md)**. Esta tabla es el resumen de diseño.
 
-### `GET /api/salud`
-Comprueba que el servidor, la base de datos y el modelo están listos.
-```json
-{ "estado": "ok", "base_datos": true, "modelo_cargado": true, "gemini_configurado": false, "origen_dato": "SIMULADO" }
-```
+| Endpoint | Vista | Entrada principal | Salida principal |
+|---|---|---|---|
+| `GET /api/salud` | — | — | estado de base, modelo, Gemini y frontend |
+| `GET /api/catalogo` | Todas | — | 46 insumos y 30 platillos con receta y costo |
+| `GET /api/inventario` | 2 | `estado` (opcional) | lotes con `horas_restantes` y `estado` CRITICO / PRECAUCION / OPTIMO |
+| `POST /api/predecir` | 1 | `insumo`, `dia_semana`, `es_quincena`, `lluvia`, `evento`, `margen_seguridad` | `clientes_estimados`, `compra_sugerida`, `costo_estimado_mxn`, `merma_evitada_mxn`, `riesgo_desabasto`, `importancia_variables` |
+| `POST /api/optimizar-menu` | 2 | `horas_umbral`, `usar_gemini` | `modo` (gemini/fallback) y estrategias sobre platillos existentes |
+| `POST /api/alerta-excedente` | 3 | `hora_actual`, `ritmo_ventas` | proyección de cierre y ficha de recolección |
+| `POST /api/alerta-excedente/{id}/enviar` | 3 | — | envío SIMULADO registrado |
+| `GET /api/auditoria` | 4 | `dias`, `insumo` | serie diaria y totales de merma evitada en kg y $MXN |
 
-### `GET /api/catalogo`
-Insumos y platillos para llenar los selectores del frontend.
-```json
-{ "insumos": [{ "id": 1, "clave": "pollo", "nombre": "Pechuga de pollo", "unidad": "kg", "precio_unitario_mxn": 135.0 }],
-  "platillos": [{ "id": 1, "clave": "enchiladas_suizas", "nombre": "Enchiladas Suizas", "precio_venta_mxn": 120.0 }],
-  "origen_dato": "SIMULADO" }
-```
-
-### `POST /api/predecir` (Vista 1)
-Entrada:
-```json
-{ "fecha": "2026-11-27", "insumo": "pollo", "margen_seguridad": 0.08,
-  "es_quincena": true, "lluvia": true, "evento_cercano": false }
-```
-Salida:
-```json
-{ "comensales_estimados": 182,
-  "insumo": { "clave": "pollo", "nombre": "Pechuga de pollo", "unidad": "kg" },
-  "prediccion_base": 23.7, "compra_sugerida": 25.6, "inversion_mxn": 3456.0,
-  "compra_tradicional": 28.0, "merma_evitada": { "cantidad": 2.4, "mxn": 324.0 },
-  "alerta_stockout": { "activa": false, "mensaje": null },
-  "importancia_variables": [ { "variable": "dia_semana", "peso": 0.45 }, { "variable": "es_quincena", "peso": 0.15 } ],
-  "origen_dato": "SIMULADO" }
-```
-Reglas: `margen_seguridad` entre 0 y 0.25. Si es menor a 0.04, `alerta_stockout.activa = true`.
-
-### `GET /api/inventario?horas_max=24` (Vista 2)
-Lotes ordenados por caducidad. `horas_max` es opcional y filtra los críticos.
-```json
-{ "lotes": [ { "lote_id": 1, "insumo": "Pechuga de pollo", "clave": "pollo", "cantidad": 7.5, "unidad": "kg",
-               "fecha_caducidad": "2026-11-27T04:00:00", "horas_para_caducar": 18.0, "estado": "rojo" } ],
-  "origen_dato": "SIMULADO" }
-```
-Semáforo: `rojo` < 24 h · `ambar` < 72 h · `verde` el resto. Se calcula al consultar, no se guarda.
-
-### `POST /api/optimizar-menu` (Vista 2)
-Entrada:
-```json
-{ "horas_umbral": 24, "usar_gemini": true }
-```
-Salida:
-```json
-{ "modo": "gemini",
-  "insumos_criticos": ["pollo", "crema", "bolillo", "carne_molida"],
-  "estrategias": [ {
-      "platillo_clave": "enchiladas_suizas", "platillo": "Enchiladas Suizas",
-      "tipo": "descuento", "descuento_pct": 25, "precio_normal_mxn": 120, "precio_oferta_mxn": 90,
-      "costo_insumos_porcion_mxn": 38.2, "porciones_objetivo": 22,
-      "insumos_rescatados": [ { "clave": "pollo", "cantidad": 4.0 }, { "clave": "crema", "cantidad": 1.3 } ],
-      "perdida_si_se_tira_mxn": 525, "margen_recuperado_mxn": 1140,
-      "copy_promocional": "Gratinadas con manchego y salsa verde cremosa. Solo hoy a precio especial." } ],
-  "origen_dato": "SIMULADO" }
-```
-Reglas que valida el backend **después** de recibir la respuesta de Gemini:
-1. `platillo_clave` debe existir en la tabla `platillos` (Gemini no puede inventar platillos).
-2. `precio_oferta_mxn` debe ser mayor que `costo_insumos_porcion_mxn`.
-3. Si algo no se cumple o Gemini falla, se responde con `"modo": "fallback"`.
-
-### `POST /api/alerta-excedente` (Vista 3)
-Entrada:
-```json
-{ "platillo": "enchiladas_suizas", "hora_actual": "15:00", "ritmo": "lento", "porciones_preparadas": 64 }
-```
-`ritmo` acepta `lento`, `normal` o `rapido`.
-
-Salida:
-```json
-{ "modo": "fallback", "proyeccion": { "vendidas_hasta_ahora": 21, "ventas_esperadas_cierre": 46, "porciones_sobrantes": 18 },
-  "alerta_activa": true,
-  "ficha": { "alimento": "18 porciones de Enchiladas Suizas", "cantidad_aprox_kg": 4.5,
-             "ventana_recoleccion": { "inicio": "16:30", "fin": "18:30" },
-             "nota_inocuidad": "Mantener en refrigeración; consumir el mismo día.",
-             "mensaje": "Texto listo para enviar al comedor comunitario." },
-  "origen_dato": "SIMULADO" }
-```
-
-### `GET /api/auditoria?dias=7&insumo=pollo` (Vista 4)
-Backtesting sobre los últimos `dias` del historial: el modelo predice cada día **sin haber visto ese día** y se compara.
-```json
-{ "insumo": "pollo", "unidad": "kg",
-  "serie": [ { "fecha": "2026-11-19", "compra_tradicional": 28.0, "demanda_real": 18.2, "compra_sugerida": 19.8 } ],
-  "resumen": { "reduccion_merma_pct": -34.5, "alimento_rescatado": 28.4, "ahorro_mxn": 3890 },
-  "origen_dato": "SIMULADO" }
-```
+Todas las respuestas incluyen `es_simulado` mientras la base sea simulada.
 
 ## 7. Flujo UX de las 4 vistas
 
