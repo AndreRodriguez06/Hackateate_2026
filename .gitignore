@@ -1,0 +1,13 @@
+# Base de datos y modelo generados (se recrean con scripts)
+data/*.db
+ml/*.pkl
+ml/metricas.json
+
+# Secretos
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
