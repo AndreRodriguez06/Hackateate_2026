@@ -35,8 +35,8 @@ class TestGenerarDatos(unittest.TestCase):
     def contar(self, sql):
         return self.con.execute(sql).fetchone()[0]
 
-    def test_al_menos_150_dias_de_historial(self):
-        self.assertGreaterEqual(self.contar("SELECT COUNT(*) FROM contexto_diario"), 150)
+    def test_un_anio_de_historial_por_defecto(self):
+        self.assertEqual(self.contar("SELECT COUNT(*) FROM contexto_diario"), 365)
 
     def test_todo_etiquetado_como_simulado(self):
         for tabla in generar_datos.TABLAS_CON_ORIGEN:
@@ -88,6 +88,25 @@ class TestGenerarDatos(unittest.TestCase):
             a = self.con.execute("SELECT * FROM contexto_diario ORDER BY fecha").fetchall()
             b = con2.execute("SELECT * FROM contexto_diario ORDER BY fecha").fetchall()
         self.assertEqual(a, b)
+
+    def test_dias_festivos_y_epocas(self):
+        f = generar_datos.dias_festivos(2026)
+        self.assertEqual(f[date(2026, 9, 16)], "Día de la Independencia")
+        self.assertEqual(f[date(2026, 4, 3)], "Viernes Santo")               # Pascua 2026: 5 de abril
+        self.assertEqual(f[date(2026, 11, 16)], "Día de la Revolución")      # tercer lunes de noviembre
+        self.assertEqual(generar_datos.epoca_del_anio(date(2026, 12, 20)), "navidena")
+        self.assertEqual(generar_datos.epoca_del_anio(date(2026, 2, 10)), "cuesta_enero")
+        self.assertEqual(generar_datos.epoca_del_anio(date(2026, 7, 4)), "verano")
+        self.assertTrue(generar_datos.es_buen_fin(date(2026, 11, 13)))       # viernes del puente
+        self.assertFalse(generar_datos.es_buen_fin(date(2026, 11, 20)))
+
+    def test_contexto_con_nuevas_variables(self):
+        columnas = {c[1] for c in self.con.execute("PRAGMA table_info(contexto_diario)")}
+        self.assertTrue({"es_dia_festivo", "nombre_festivo", "epoca_anio", "evento_plaza"} <= columnas)
+        self.assertNotIn("temporada_vacacional", columnas)
+        epocas = {f[0] for f in self.con.execute("SELECT DISTINCT epoca_anio FROM contexto_diario")}
+        self.assertEqual(epocas, set(generar_datos.EPOCAS))                  # 365 días cubren las 4 épocas
+        self.assertGreater(self.contar("SELECT COUNT(*) FROM contexto_diario WHERE es_dia_festivo = 1"), 8)
 
     def test_quincena_se_recorre_a_viernes(self):
         # 15 de noviembre de 2026 es domingo: se paga el viernes 13.

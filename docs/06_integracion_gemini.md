@@ -1,7 +1,7 @@
 # 06 · Integración de Google Gemini (sin chatbots)
 
 > **Apartado 6 · Orden 3.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado sin llave (`tests/test_gemini_service.py`, 20 pruebas; total del repositorio, 56).
+> Estado: ✅ implementado y probado sin llave (`tests/test_gemini_service.py`, 20 pruebas; total del repositorio, 64).
 > ⏳ **Pendiente:** probar con una `GEMINI_API_KEY` válida. Ver la sección 9.
 
 > ⚠️ Gemini trabaja sobre datos **SIMULADOS** (inventario, menú y precios del Apartado 2). La interfaz siempre indica si un resultado viene de Gemini o del modo respaldo.
@@ -261,7 +261,7 @@ El tiempo máximo de espera (15 s) evita que la demo se congele si la red es len
 **Sin llave (lo que ya se probó):**
 
 ```bash
-python -m unittest discover -s tests -v     # 56 pruebas, 20 de Gemini
+python -m unittest discover -s tests -v     # 64 pruebas, 20 de Gemini
 python backend/gemini_service.py            # imprime promociones y ficha en modo respaldo
 ```
 

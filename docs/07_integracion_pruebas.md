@@ -1,7 +1,7 @@
 # 07 · Integración final y pruebas de punta a punta
 
 > **Apartado 7 · Orden 4.1** de la Tabla de Medios y Fines.
-> Estado: ✅ el repositorio se instala y corre desde cero con Python 3.10 y 3.13 siguiendo solo el `README.md`.
+> Estado: ✅ el repositorio se instala y corre desde cero con Python 3.10 y 3.13 siguiendo solo el `README.md`. Las secciones 4.1 a 4.5 son la corrida original; la 4.6, la regresión tras los cambios de variables y la Vista 5.
 > Todas las pruebas usan datos **SIMULADOS**.
 
 ## 1. Objetivo
@@ -18,7 +18,7 @@ Demostrar que cualquier persona puede clonar el repositorio, instalarlo y usar e
 | `git clone` desde GitHub en carpeta vacía + entorno virtual nuevo | Simula una computadora limpia. |
 | Python 3.10.20 y 3.13.18 | Versión mínima declarada y versión reciente. |
 | `requirements.txt` con versiones fijas | Instalación reproducible. |
-| `python -m unittest` (56 pruebas) | Pruebas unitarias y de API. |
+| `python -m unittest` (64 pruebas; 56 en la corrida original) | Pruebas unitarias y de API. |
 | `scripts/prueba_humo.py` (8 casos) | Prueba de punta a punta por HTTP; cualquiera la puede correr. |
 | Chromium + Playwright (8 casos) | Prueba de punta a punta en navegador. |
 | Llamada real a la API de Gemini con llave falsa | Verifica el respaldo ante un error real de Google. |
@@ -102,6 +102,27 @@ Nota: en el entorno de prueba los CDN estaban bloqueados, así que Tailwind, Cha
 | API (`POST /api/predecir`) | 3.9 % / 4.0 % / 30 % | alerta / sin alerta / 422 | ✅ (HUMO-05) |
 | Interfaz (Vista 1) | 3 % / 4 % | banner visible / oculto | ✅ (E2E-03) |
 
+### 4.6 Regresión tras los cambios del 2026-11-26 (festivos, épocas, eventos en la plaza y Vista 5)
+
+Cambios probados:
+- se eliminó "vacaciones escolares";
+- se agregaron día festivo, época del año y evento en la plaza;
+- el historial pasó de 180 a 365 días;
+- el modelo pasó a índice relativo con hiperparámetros elegidos por validación cruzada;
+- se agregaron la Vista 5 (Historial de compras) y `GET /api/historial-compras`;
+- reentrenamiento automático al cambiar los datos, y exportación a CSV.
+
+| ID | Prueba | Resultado | Detalle observado |
+|---|---|---|---|
+| REG-01 | `python -m unittest discover -s tests` | ✅ 64/64 | Incluye pruebas nuevas de festivos, épocas, Buen Fin, historial fuera de muestra, carga de un modelo entrenado desde la terminal y `/api/historial-compras` |
+| REG-02 | `python scripts/prueba_humo.py` | ✅ 9/9 | Caso nuevo HUMO-09: 13 meses, ahorro en compras $914,956, merma −72.4 %, 53 semanas de pollo |
+| REG-03 | Vista 1 en navegador (escritorio, `file://` y 390 px) | ✅ | "Lunes de Cuesta de Enero" → 103 clientes; sábado navideño festivo con evento en la plaza → 260 clientes, 23.5 kg de pollo; el selector cambia a "Personalizado" |
+| REG-04 | Vista 5 en navegador (escritorio, `file://` y 390 px) | ✅ | Semana/todos: $3,073,057 contra $2,158,100, ahorro $914,956; por mes 13 filas; por día 365 filas; con y sin servidor difieren < $30 por redondeo; sin errores en consola ni desplazamiento horizontal |
+| REG-05 | Reentrenamiento automático | ✅ | Un modelo con datos de otra versión se detectó al arrancar ("El modelo se entrenó con otra versión de los datos") y se reentrenó solo |
+| REG-06 | `python scripts/exportar_csv.py` | ✅ | 12 archivos CSV en `data/csv/` (compras_diarias: 16,790 filas) |
+
+Defecto encontrado en esta regresión: un modelo entrenado con `python ml/modelo_demanda.py entrenar` guardaba la clase como `__main__.RandomForestRelativo` y el backend no podía leerlo. Se corrigió ejecutando el comando desde el módulo `ml.modelo_demanda`; lo cubre la prueba `test_modelo_entrenado_desde_la_terminal_se_puede_cargar`.
+
 ## 5. Defectos encontrados y corregidos durante la integración
 
 | # | Defecto | Cómo se detectó | Corrección |
@@ -121,7 +142,7 @@ Nota: en el entorno de prueba los CDN estaban bloqueados, así que Tailwind, Cha
 | Llamada exitosa a Gemini con una llave real | Quien tenga la llave | `python backend/gemini_service.py` → `"modo_respaldo": false` en ambas funciones; revisar que los textos sean adecuados |
 | Interfaz con los CDN reales (internet normal) | Cualquiera | Abrir <http://localhost:8000> y confirmar estilos, iconos y gráficas |
 | Windows (cmd / PowerShell) | Quien use Windows | Seguir el README; en PowerShell 5 correr los comandos del paso 3 por separado |
-| Firefox y Safari | Cualquiera | Recorrer las 4 vistas |
+| Firefox y Safari | Cualquiera | Recorrer las 5 vistas |
 | Rama de trabajo fusionada a la rama principal | Dueño del repositorio | El `git clone` del README descarga la rama principal |
 
 ## 7. Checklist de verificación previa a la entrega
@@ -133,8 +154,8 @@ En una computadora que **no** haya tenido el proyecto:
 - [ ] `python -m venv .venv`, activarlo y `pip install -r requirements.txt` sin errores.
 - [ ] `python data/generar_datos.py` termina con "Verificación OK".
 - [ ] `uvicorn backend.main:app --reload` arranca y <http://localhost:8000> muestra el distintivo ámbar y "API conectada".
-- [ ] `python -m unittest discover -s tests` → 56 pruebas OK.
-- [ ] Con el servidor encendido, `python scripts/prueba_humo.py` → 8/8.
+- [ ] `python -m unittest discover -s tests` → 64 pruebas OK.
+- [ ] Con el servidor encendido, `python scripts/prueba_humo.py` → 9/9.
 - [ ] Sin `.env`: la Vista 2 muestra "Reglas locales (modo respaldo)".
 - [ ] Con `.env` y llave real: la Vista 2 muestra "Generado con Gemini · gemini-2.5-flash".
 - [ ] Doble clic en `frontend/index.html` → "Modo demo autónoma".
@@ -158,9 +179,9 @@ Recomendaciones para la demo:
 ## 9. Cómo repetir estas pruebas
 
 ```bash
-python -m unittest discover -s tests -v        # 56 pruebas
+python -m unittest discover -s tests -v        # 64 pruebas
 uvicorn backend.main:app                       # en otra terminal
-python scripts/prueba_humo.py                  # 8 casos de punta a punta
+python scripts/prueba_humo.py                  # 9 casos de punta a punta
 ```
 
 Las pruebas en navegador se hicieron con Playwright fuera del repositorio. Para repetirlas a mano, seguir el checklist de la sección 7 y el guion de la demo.

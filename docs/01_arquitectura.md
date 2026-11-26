@@ -27,7 +27,7 @@ Y una cuarta vista demuestra el impacto: **Auditoría y backtesting**.
 
 | ID | Función | Vista | Endpoint |
 |---|---|---|---|
-| RF-01 | Predecir los comensales del día a partir de calendario, clima, quincena y eventos. | 1 | `POST /api/predecir` |
+| RF-01 | Predecir los comensales del día a partir de calendario (día de la semana, quincena, días festivos, época del año), clima y eventos (cercanos y en la plaza). | 1 | `POST /api/predecir` |
 | RF-02 | Calcular la compra sugerida por insumo: `predicción base × (1 + margen de seguridad)`. | 1 | `POST /api/predecir` |
 | RF-03 | Permitir ajustar el margen de seguridad (0 % a 25 %) y recalcular al instante. | 1 | `POST /api/predecir` |
 | RF-04 | Alertar riesgo de desabasto si el margen es menor a 4 %. | 1 | `POST /api/predecir` |
@@ -40,6 +40,7 @@ Y una cuarta vista demuestra el impacto: **Auditoría y backtesting**.
 | RF-11 | Proyectar porciones sobrantes al cierre según la hora y el ritmo de ventas. | 3 | `POST /api/alerta-excedente` |
 | RF-12 | Generar una ficha de rescate (alimento, cantidad, ventana de recolección, nota de inocuidad). | 3 | `POST /api/alerta-excedente` |
 | RF-13 | Comparar día a día compra tradicional, demanda real y compra sugerida (backtesting). | 4 | `GET /api/auditoria` |
+| RF-16 | Consultar lo que se compró cada día según la base, agrupado por día, semana o mes, para todos los productos o uno, y cuánto se habría ahorrado con el modelo. | 5 | `GET /api/historial-compras` |
 | RF-14 | Mostrar en toda la interfaz que los datos son **SIMULADOS**. | Todas | Campo `origen_dato` en cada respuesta |
 | RF-15 | Funcionar sin internet hacia Gemini: modo *fallback* con respuestas calculadas localmente. | 2 y 3 | Campo `modo` en la respuesta |
 
@@ -62,7 +63,7 @@ Y una cuarta vista demuestra el impacto: **Auditoría y backtesting**.
 ```mermaid
 flowchart LR
     subgraph Navegador
-        UI[Frontend<br/>HTML + Tailwind + Vanilla JS + Chart.js<br/>4 vistas]
+        UI[Frontend<br/>HTML + Tailwind + Vanilla JS + Chart.js<br/>5 vistas]
     end
 
     subgraph Servidor["Servidor local · uvicorn :8000"]
@@ -123,13 +124,15 @@ Hackateate_2026/
 │   ├── gemini_service.py          ✅ Apartado 6 · Gemini con response_schema + modo respaldo
 │   └── services/
 │       ├── rescate_menu.py        ✅ Apartado 4 · promociones (reglas + validación de Gemini)
-│       └── alerta_excedente.py    ✅ Apartado 4 · proyección y ficha de rescate
+│       ├── alerta_excedente.py    ✅ Apartado 4 · proyección y ficha de rescate
+│       └── historial_compras.py   ✅ Vista 5 · compras por día, semana o mes vs. modelo
 ├── frontend/
-│   ├── index.html                 ✅ Apartado 5 · 4 vistas
+│   ├── index.html                 ✅ Apartado 5 · 5 vistas
 │   ├── app.js                     ✅ Apartado 5 · consume /api/* con respaldo local
 │   └── datos_demo.js              ✅ Apartado 5 · respuestas precalculadas (modo demo autónoma)
 ├── scripts/
 │   ├── exportar_datos_demo.py     ✅ Apartado 5 · genera frontend/datos_demo.js
+│   ├── exportar_csv.py            ✅ exporta la base a CSV para Excel
 │   └── prueba_humo.py             ✅ Apartado 7 · prueba de punta a punta por HTTP
 ├── prueba1/                       ✅ prototipo visual 100 % en navegador (referencia de diseño)
 ├── tests/
@@ -157,15 +160,16 @@ Hackateate_2026/
 | `GET /api/salud` | — | — | estado de base, modelo, Gemini y frontend |
 | `GET /api/catalogo` | Todas | — | 46 insumos y 30 platillos con receta y costo |
 | `GET /api/inventario` | 2 | `estado` (opcional) | lotes con `horas_restantes` y `estado` CRITICO / PRECAUCION / OPTIMO |
-| `POST /api/predecir` | 1 | `insumo`, `dia_semana`, `es_quincena`, `lluvia`, `evento`, `margen_seguridad` | `clientes_estimados`, `compra_sugerida`, `costo_estimado_mxn`, `merma_evitada_mxn`, `riesgo_desabasto`, `importancia_variables` |
+| `POST /api/predecir` | 1 | `insumo`, `dia_semana`, `es_quincena`, `lluvia`, `evento`, `evento_plaza`, `es_dia_festivo`, `epoca`, `margen_seguridad` | `clientes_estimados`, `compra_sugerida`, `costo_estimado_mxn`, `merma_evitada_mxn`, `riesgo_desabasto`, `importancia_variables` |
 | `POST /api/optimizar-menu` | 2 | `horas_umbral`, `usar_gemini` | `modo` (gemini/fallback) y estrategias sobre platillos existentes |
 | `POST /api/alerta-excedente` | 3 | `hora_actual`, `ritmo_ventas` | proyección de cierre y ficha de recolección |
 | `POST /api/alerta-excedente/{id}/enviar` | 3 | — | envío SIMULADO registrado |
 | `GET /api/auditoria` | 4 | `dias`, `insumo` | serie diaria y totales de merma evitada en kg y $MXN |
+| `GET /api/historial-compras` | 5 | `agrupar`, `insumo` | compras registradas vs. consumo vs. sugerencia del modelo, y ahorro |
 
 Todas las respuestas incluyen `es_simulado` mientras la base sea simulada.
 
-## 7. Flujo UX de las 4 vistas
+## 7. Flujo UX de las 5 vistas
 
 ```mermaid
 flowchart TD
@@ -179,6 +183,8 @@ flowchart TD
     B -- "Tarde: monitoreo del turno" --> V3[Vista 3 · Alerta temprana]
     V3 --> V3a[Hora y ritmo de ventas] -- "sobrante proyectado" --> V3b[Genera ficha de rescate] --> V3c[Envía aviso al comedor comunitario]
     B -- "Semanal: rendir cuentas" --> V4[Vista 4 · Auditoría y backtesting]
+    B -- "Mensual: revisar compras" --> V5[Vista 5 · Historial de compras]
+    V5 --> V5a[Día, semana o mes · todos o un producto] --> V5b[Comprado vs. consumido vs. sugerido y ahorro]
     V4 --> V4a[KPIs + gráfica semanal + fuentes y metodología]
 ```
 

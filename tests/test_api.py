@@ -72,13 +72,20 @@ class TestAPI(unittest.TestCase):
         self.assertFalse(d["riesgo_desabasto"])
         self.assertGreaterEqual(d["merma_evitada_mxn"], 0)
         self.assertTrue(d["es_simulado"])
-        self.assertEqual(len(d["importancia_variables"]), 5)
+        self.assertEqual(len(d["importancia_variables"]), 7)
 
     def test_predecir_alerta_desabasto(self):
         d = self.cliente.post("/api/predecir", json={"insumo": "crema", "dia_semana": 1,
                                                       "margen_seguridad": 0.02}).json()
         self.assertTrue(d["riesgo_desabasto"])
         self.assertIsNotNone(d["mensaje_riesgo"])
+
+    def test_predecir_con_calendario(self):
+        d = self.cliente.post("/api/predecir", json={"insumo": "pollo", "dia_semana": 5, "es_dia_festivo": True,
+                                                      "evento_plaza": True, "epoca": "navidena"})
+        self.assertEqual(d.status_code, 200)
+        self.assertEqual(self.cliente.post("/api/predecir", json={"insumo": "pollo", "dia_semana": 1,
+                                                                  "epoca": "vacaciones"}).status_code, 422)
 
     def test_predecir_errores(self):
         self.assertEqual(self.cliente.post("/api/predecir", json={"insumo": "pollo", "dia_semana": 9}).status_code, 422)
@@ -172,6 +179,24 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(self.cliente.post("/api/alerta-excedente", json={"hora_actual": "07:00"}).status_code, 400)
         self.assertEqual(self.cliente.post("/api/alerta-excedente",
                                            json={"hora_actual": "15:00", "platillo": "caviar"}).status_code, 404)
+
+    # --- Historial de compras ---
+    def test_historial_por_mes_todos(self):
+        d = self.cliente.get("/api/historial-compras", params={"agrupar": "mes"}).json()
+        self.assertEqual(d["unidad"], "MXN")
+        self.assertIsNone(d["serie"][0]["compra_sugerida"])                    # primeros días: sin predicción
+        self.assertIsNotNone(d["serie"][-1]["compra_sugerida"])
+        t = d["totales"]
+        self.assertAlmostEqual(t["ahorro_compra_mxn"], t["compra_tradicional_mxn"] - t["compra_sugerida_mxn"], 1)
+        self.assertEqual(sum(f["dias"] for f in d["serie"]), d["periodo"]["dias"])
+        self.assertTrue(d["es_simulado"])
+
+    def test_historial_por_dia_un_producto(self):
+        d = self.cliente.get("/api/historial-compras", params={"agrupar": "dia", "insumo": "pollo"}).json()
+        self.assertEqual(d["unidad"], "kg")
+        self.assertEqual(len(d["serie"]), d["periodo"]["dias"])
+        self.assertEqual(self.cliente.get("/api/historial-compras", params={"insumo": "caviar"}).status_code, 404)
+        self.assertEqual(self.cliente.get("/api/historial-compras", params={"agrupar": "anio"}).status_code, 422)
 
     # --- Auditoría ---
     def test_auditoria_ultimos_7_dias(self):

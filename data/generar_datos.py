@@ -8,7 +8,8 @@ y la llena con datos ficticios, pero coherentes, de un restaurante de plaza
 comercial en México:
 
   * catálogo de insumos y menú vigente con su recetario
-  * N días de historial (por defecto 180): afluencia, clima, quincena, eventos
+  * N días de historial (por defecto 365): afluencia, clima, quincena, días festivos,
+    época del año, eventos cercanos y eventos en la plaza
   * ventas diarias por platillo
   * consumo diario por insumo vs. compra tradicional "a ojo" (merma y faltantes)
   * inventario actual por lotes, con caducidades relativas a la hora de ejecución
@@ -19,8 +20,9 @@ TODOS los registros llevan origen_dato = 'SIMULADO' (regla de la rúbrica).
 Solo usa la librería estándar de Python (no requiere pip install).
 
 Uso:
-    python data/generar_datos.py                    # 180 días, semilla 42
-    python data/generar_datos.py --dias 365         # más historial
+    python data/generar_datos.py                    # 365 días, semilla 42
+    python data/generar_datos.py --semilla 7        # otro restaurante simulado (datos distintos)
+    python data/generar_datos.py --dias 730         # más historial
     python data/generar_datos.py --solo-inventario  # solo refresca caducidades antes de la demo
     python data/generar_datos.py --help
 """
@@ -227,8 +229,20 @@ COMENSALES_BASE = [118, 112, 122, 132, 168, 195, 172]
 
 EFECTO_QUINCENA = 0.12        # +12 % comensales en días de pago
 EFECTO_LLUVIA = 0.06          # +6 % (plaza techada: la gente se refugia)
-EFECTO_EVENTO = 0.15          # +15 % evento cercano (concierto, evento universitario)
-EFECTO_VACACIONES = -0.10     # -10 % vacaciones escolares (menos estudiantes)
+EFECTO_EVENTO = 0.15          # +15 % evento cercano (concierto, partido, evento universitario)
+EFECTO_EVENTO_PLAZA = 0.20    # +20 % evento en la plaza (Buen Fin, exposición, concierto en la plaza)
+EFECTO_FESTIVO = 0.18         # +18 % día festivo (la gente pasea en la plaza)
+
+# Época del año (multiplica la afluencia). El orden define el código numérico del modelo.
+EPOCAS = ["regular", "navidena", "cuesta_enero", "verano"]
+NOMBRES_EPOCA = {"regular": "Regular", "navidena": "Temporada navideña",
+                 "cuesta_enero": "Cuesta de enero", "verano": "Verano"}
+EFECTO_EPOCA = {
+    "regular": 0.00,
+    "navidena": 0.15,         # diciembre: aguinaldo, compras y posadas
+    "cuesta_enero": -0.12,    # enero y primera quincena de febrero: menos gasto
+    "verano": 0.05,           # julio y agosto: familias de vacaciones en la plaza
+}
 CRECIMIENTO_PERIODO = 0.03    # +3 % de tendencia a lo largo del historial
 RUIDO_COMENSALES = 0.07       # desviación estándar relativa del ruido diario
 RUIDO_PLATILLO = 0.10         # desviación estándar relativa por platillo
@@ -269,7 +283,7 @@ def redondear_a_empaque(cantidad: float, unidad: str) -> float:
 
 
 # =============================================================================
-# 3. CALENDARIO: quincenas, vacaciones, eventos y clima
+# 3. CALENDARIO: quincenas, días festivos, épocas del año y eventos
 # =============================================================================
 
 def _ajustar_a_dia_habil(d: date) -> date:
@@ -294,10 +308,66 @@ def es_quincena(d: date) -> bool:
     return any(0 <= (d - p).days <= 1 for p in pagos)
 
 
-def es_temporada_vacacional(d: date) -> bool:
-    """Vacaciones escolares aproximadas (verano e invierno)."""
-    return ((d.month == 7 and d.day >= 10) or (d.month == 8 and d.day <= 15)
-            or (d.month == 12 and d.day >= 15) or (d.month == 1 and d.day <= 7))
+def _domingo_de_pascua(anio: int) -> date:
+    """Algoritmo anónimo gregoriano (Meeus/Jones/Butcher)."""
+    a, b, c = anio % 19, anio // 100, anio % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    mes = (h + l - 7 * m + 114) // 31
+    dia = ((h + l - 7 * m + 114) % 31) + 1
+    return date(anio, mes, dia)
+
+
+def _enesimo_lunes(anio: int, mes: int, n: int) -> date:
+    primero = date(anio, mes, 1)
+    return primero + timedelta(days=(7 - primero.weekday()) % 7 + 7 * (n - 1))
+
+
+def dias_festivos(anio: int) -> dict[date, str]:
+    """
+    Días de descanso obligatorio (Ley Federal del Trabajo, art. 74) más fechas
+    tradicionales en que la gente sale a comer o a pasear.
+    """
+    pascua = _domingo_de_pascua(anio)
+    return {
+        date(anio, 1, 1): "Año Nuevo",
+        _enesimo_lunes(anio, 2, 1): "Día de la Constitución",
+        _enesimo_lunes(anio, 3, 3): "Natalicio de Benito Juárez",
+        pascua - timedelta(days=3): "Jueves Santo",
+        pascua - timedelta(days=2): "Viernes Santo",
+        date(anio, 5, 1): "Día del Trabajo",
+        date(anio, 5, 10): "Día de las Madres",
+        date(anio, 9, 16): "Día de la Independencia",
+        date(anio, 11, 2): "Día de Muertos",
+        _enesimo_lunes(anio, 11, 3): "Día de la Revolución",
+        date(anio, 12, 12): "Día de la Virgen de Guadalupe",
+        date(anio, 12, 25): "Navidad",
+    }
+
+
+def nombre_festivo(d: date) -> str | None:
+    return dias_festivos(d.year).get(d)
+
+
+def epoca_del_anio(d: date) -> str:
+    if d.month == 12:
+        return "navidena"
+    if d.month == 1 or (d.month == 2 and d.day <= 15):
+        return "cuesta_enero"
+    if d.month in (7, 8):
+        return "verano"
+    return "regular"
+
+
+def es_buen_fin(d: date) -> bool:
+    """El Buen Fin coincide con el puente de la Revolución: de viernes a lunes."""
+    lunes = _enesimo_lunes(d.year, 11, 3)
+    return lunes - timedelta(days=3) <= d <= lunes
 
 
 # =============================================================================
@@ -339,17 +409,20 @@ def simular_contexto(d: date, indice: int, total_dias: int, rng: random.Random) 
     """Variables de contexto y afluencia de un día."""
     dow = d.weekday()
     quincena = es_quincena(d)
+    festivo = nombre_festivo(d)
+    epoca = epoca_del_anio(d)
     lluvia = rng.random() < PROB_LLUVIA_MES[d.month - 1]
-    prob_evento = 0.12 if dow in (4, 5) else 0.05
-    evento = rng.random() < prob_evento
-    vacaciones = es_temporada_vacacional(d)
+    evento = rng.random() < (0.12 if dow in (4, 5) else 0.05)
+    evento_plaza = es_buen_fin(d) or rng.random() < (0.10 if dow >= 4 else 0.04)
     temperatura = TEMP_MEDIA_MES[d.month - 1] + rng.gauss(0, 2.0) - (2.0 if lluvia else 0.0)
 
     factor = 1.0
     factor += EFECTO_QUINCENA if quincena else 0.0
     factor += EFECTO_LLUVIA if lluvia else 0.0
     factor += EFECTO_EVENTO if evento else 0.0
-    factor += EFECTO_VACACIONES if vacaciones else 0.0
+    factor += EFECTO_EVENTO_PLAZA if evento_plaza else 0.0
+    factor += EFECTO_FESTIVO if festivo else 0.0
+    factor += EFECTO_EPOCA[epoca]
     factor *= 1.0 + CRECIMIENTO_PERIODO * (indice / max(1, total_dias - 1))
     ruido = max(0.6, rng.gauss(1.0, RUIDO_COMENSALES))
     comensales = max(0, round(COMENSALES_BASE[dow] * factor * ruido))
@@ -357,8 +430,9 @@ def simular_contexto(d: date, indice: int, total_dias: int, rng: random.Random) 
     return {
         "fecha": d.isoformat(), "dia_semana": dow, "mes": d.month,
         "es_fin_de_semana": int(dow >= 5), "es_quincena": int(quincena),
+        "es_dia_festivo": int(bool(festivo)), "nombre_festivo": festivo, "epoca_anio": epoca,
         "lluvia": int(lluvia), "temperatura_c": round(temperatura, 1),
-        "evento_cercano": int(evento), "temporada_vacacional": int(vacaciones),
+        "evento_cercano": int(evento), "evento_plaza": int(evento_plaza),
         "comensales": comensales,
     }
 
@@ -378,6 +452,20 @@ AJUSTE_QUINCENA = {         # con dinero en la bolsa suben los platillos más ca
 AJUSTE_CALOR = {            # 22 °C o más: bebidas frías
     "agua_fresca": 1.20, "limonada": 1.25, "licuado_platano": 1.10,
 }
+AJUSTE_EVENTO_PLAZA = {     # gente de paso en la plaza: comida rápida y bebidas
+    "hamburguesa": 1.25, "tacos_pastor": 1.20, "limonada": 1.15, "agua_fresca": 1.10,
+}
+AJUSTE_EPOCA = {
+    "navidena": {"tamales_verdes": 1.30, "cafe_americano": 1.20, "flan": 1.25, "pozole_rojo": 1.15},
+    "cuesta_enero": {"molletes": 1.20, "quesadillas": 1.20, "sopa_tortilla": 1.15, "enfrijoladas": 1.15,
+                     "bistec_mexicana": 0.85, "hamburguesa": 0.90, "club_sandwich": 0.85},
+    "verano": {"agua_fresca": 1.20, "limonada": 1.25, "ensalada_cesar": 1.15, "pozole_rojo": 0.85},
+}
+AJUSTE_FESTIVO_ESPECIAL = {  # platillos típicos de algunas fechas
+    "Día de la Independencia": {"pozole_rojo": 2.00},
+    "Día de la Virgen de Guadalupe": {"tamales_verdes": 1.50},
+    "Día de las Madres": {"flan": 1.50, "enchiladas_suizas": 1.20},
+}
 
 
 def simular_ventas(ctx: dict, rng: random.Random) -> dict[str, int]:
@@ -387,8 +475,13 @@ def simular_ventas(ctx: dict, rng: random.Random) -> dict[str, int]:
         ajuste = 1.0
         if ctx["lluvia"]:
             ajuste *= AJUSTE_LLUVIA.get(clave, 1.0)
-        if ctx["es_fin_de_semana"]:
+        if ctx["es_fin_de_semana"] or ctx["es_dia_festivo"]:   # los festivos se comportan como fin de semana
             ajuste *= AJUSTE_FIN_DE_SEMANA.get(clave, 1.0)
+        if ctx["nombre_festivo"]:
+            ajuste *= AJUSTE_FESTIVO_ESPECIAL.get(ctx["nombre_festivo"], {}).get(clave, 1.0)
+        if ctx["evento_plaza"]:
+            ajuste *= AJUSTE_EVENTO_PLAZA.get(clave, 1.0)
+        ajuste *= AJUSTE_EPOCA.get(ctx["epoca_anio"], {}).get(clave, 1.0)
         if ctx["es_quincena"]:
             ajuste *= AJUSTE_QUINCENA.get(clave, 1.0)
         if ctx["temperatura_c"] >= 22:
@@ -409,10 +502,10 @@ def generar_historial(con: sqlite3.Connection, ids_insumo: dict, ids_platillo: d
         d = fecha_inicio + timedelta(days=indice)
         ctx = simular_contexto(d, indice, dias, rng)
         con.execute(
-            "INSERT INTO contexto_diario (fecha, dia_semana, mes, es_fin_de_semana, es_quincena, lluvia,"
-            " temperatura_c, evento_cercano, temporada_vacacional, comensales, origen_dato)"
-            " VALUES (:fecha,:dia_semana,:mes,:es_fin_de_semana,:es_quincena,:lluvia,:temperatura_c,"
-            " :evento_cercano,:temporada_vacacional,:comensales,'SIMULADO')",
+            "INSERT INTO contexto_diario (fecha, dia_semana, mes, es_fin_de_semana, es_quincena, es_dia_festivo,"
+            " nombre_festivo, epoca_anio, lluvia, temperatura_c, evento_cercano, evento_plaza, comensales, origen_dato)"
+            " VALUES (:fecha,:dia_semana,:mes,:es_fin_de_semana,:es_quincena,:es_dia_festivo,:nombre_festivo,"
+            " :epoca_anio,:lluvia,:temperatura_c,:evento_cercano,:evento_plaza,:comensales,'SIMULADO')",
             ctx,
         )
 
@@ -603,6 +696,10 @@ def imprimir_resumen(con: sqlite3.Connection, ruta_db: Path) -> None:
         " FROM contexto_diario").fetchone()
     print(f"\nHistorial: {ini} a {fin} | comensales promedio/día: {prom:.0f}"
           f" | días con lluvia: {lluvia:.0%} | días de quincena: {quin:.0%}")
+    fest, plaza = con.execute("SELECT SUM(es_dia_festivo), SUM(evento_plaza) FROM contexto_diario").fetchone()
+    epocas = ", ".join(f"{NOMBRES_EPOCA[e].lower()} {n} d"
+                       for e, n in con.execute("SELECT epoca_anio, COUNT(*) FROM contexto_diario GROUP BY 1"))
+    print(f"Días festivos: {fest} | días con evento en la plaza: {plaza} | épocas: {epocas}")
 
     kg, mxn, faltante = con.execute(
         "SELECT SUM(c.merma_tradicional), SUM(c.merma_tradicional * i.precio_unitario_mxn),"
@@ -627,7 +724,7 @@ def imprimir_resumen(con: sqlite3.Connection, ruta_db: Path) -> None:
 def parsear_argumentos(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Genera la base de datos SIMULADA de ZeroMerma AI.")
     p.add_argument("--db", type=Path, default=RUTA_DB_DEFAULT, help="Ruta del archivo SQLite a crear.")
-    p.add_argument("--dias", type=int, default=180, help="Días de historial (mínimo 150).")
+    p.add_argument("--dias", type=int, default=365, help="Días de historial (mínimo 150; 365 o más para cubrir todas las épocas del año).")
     p.add_argument("--semilla", type=int, default=42, help="Semilla aleatoria (misma semilla = mismos datos).")
     p.add_argument("--fecha-fin", type=date.fromisoformat, default=None,
                    help="Último día del historial (AAAA-MM-DD). Por defecto: ayer.")

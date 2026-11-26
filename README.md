@@ -27,7 +27,7 @@ El problema se delimita a: **un restaurante**, **insumos perecederos**, **decisi
 | **Personal de cocina y gerente de turno** | Vender hoy lo que está por caducar; saber a media jornada si sobrará comida | 2 · Rescate en menú · 3 · Alerta temprana |
 | **Comensales** | Ofertas atractivas en platillos que ya conocen | Menú digital QR (vista previa en la Vista 2) |
 | **Receptores: comedores comunitarios y red estudiantil** | Avisos con tiempo, cantidad exacta y cuidados de inocuidad | Ficha de rescate (Vista 3) |
-| **Dueño** | Evidencia del ahorro | 4 · Auditoría y backtesting |
+| **Dueño** | Evidencia del ahorro | 4 · Auditoría y backtesting · 5 · Historial de compras |
 
 ### Evidencia que sustenta el problema
 
@@ -43,13 +43,14 @@ El problema se delimita a: **un restaurante**, **insumos perecederos**, **decisi
 
 ## 2. La solución y su flujo principal
 
-ZeroMerma AI acompaña los cuatro momentos del día en que se decide la merma:
+ZeroMerma AI acompaña los momentos en que se decide la merma, del día a día al cierre de mes:
 
 ```mermaid
 flowchart LR
     A["🌅 Mañana<br/><b>1 · Planeador de compras</b><br/>Random Forest predice el consumo<br/>compra = demanda × (1 + margen)"] --> B["🕛 Mediodía<br/><b>2 · Rescate en menú</b><br/>Gemini propone promociones<br/>en platillos existentes y rentables"]
     B --> C["🕒 Tarde<br/><b>3 · Alerta temprana</b><br/>proyección de sobrante al cierre<br/>ficha para comedor comunitario"]
     C --> D["📊 Semana<br/><b>4 · Auditoría</b><br/>backtesting sin fuga de datos<br/>merma evitada en kg y $MXN"]
+    D --> E["🗂️ Mes<br/><b>5 · Historial de compras</b><br/>compras registradas día a día<br/>vs. sugerencia del modelo"]
 ```
 
 ```mermaid
@@ -128,20 +129,27 @@ Para comprobar que Gemini funciona: `python backend/gemini_service.py`. Debe mos
 ### Verificar que todo funciona
 
 ```bash
-python -m unittest discover -s tests -v    # 56 pruebas automáticas (datos, modelo, API, Gemini)
-python scripts/prueba_humo.py              # 8 casos de punta a punta, con el servidor encendido
+python -m unittest discover -s tests -v    # 64 pruebas automáticas (datos, modelo, API, Gemini)
+python scripts/prueba_humo.py              # 9 casos de punta a punta, con el servidor encendido
+```
+
+### Ver la base de datos y simular datos distintos
+
+```bash
+python scripts/exportar_csv.py             # exporta todas las tablas a data/csv/ (se abren en Excel)
+python data/generar_datos.py --semilla 7   # otro restaurante simulado; el servidor reentrena el modelo solo
 ```
 
 ---
 
 ## 4. Declaración de simulaciones
 
-**Dónde empieza la simulación:** en [`data/generar_datos.py`](data/generar_datos.py). Ese script inventa, con reglas documentadas y una semilla fija, el restaurante y sus 180 días de historia. **Todo lo que sale de la base `data/restaurante.db` es SIMULADO.** Cada tabla tiene la columna `origen_dato`, que la base solo acepta como `'SIMULADO'` o `'REAL'`, y cada respuesta de la API incluye `es_simulado`.
+**Dónde empieza la simulación:** en [`data/generar_datos.py`](data/generar_datos.py). Ese script inventa, con reglas documentadas y una semilla fija, el restaurante y sus 365 días de historia. **Todo lo que sale de la base `data/restaurante.db` es SIMULADO.** Cada tabla tiene la columna `origen_dato`, que la base solo acepta como `'SIMULADO'` o `'REAL'`, y cada respuesta de la API incluye `es_simulado`.
 
 | Parte del sistema | ¿Simulado? | Detalle |
 |---|---|---|
 | Restaurante "Cafetería La Esquina", menú de 30 platillos y recetario | **SIMULADO** | Ficticios; porciones típicas de cocina mexicana. |
-| Historial de 180 días: afluencia, clima, quincena, eventos, ventas, consumo | **SIMULADO** | Reglas en `docs/02_base_de_datos.md`. |
+| Historial de 365 días: afluencia, clima, quincena, días festivos, época del año, eventos cercanos y en la plaza, ventas, consumo | **SIMULADO** | Reglas en `docs/02_base_de_datos.md`. |
 | Compra tradicional "a ojo" y su merma | **SIMULADO** | Es la línea base contra la que se compara. |
 | Inventario con caducidades | **SIMULADO** | Relativo a la hora en que se genera, para que siempre haya insumos críticos. |
 | Precios de los 46 insumos | **SIMULADO (provisional)** | Pendiente sustituir por PROFECO *Quién es Quién en los Precios*; la columna `fuente_precio` lo indica. |
@@ -160,9 +168,10 @@ Corrida del 2026-11-26. Las cifras cambian ligeramente si se regeneran los datos
 
 | Indicador | Resultado | Detalle |
 |---|---|---|
-| Error del modelo en el mes de prueba (nunca visto) | MAE 8.8 comensales (R² 0.91); error medio por insumo 9.2 % | [`docs/03_modelo_ml.md`](docs/03_modelo_ml.md) |
-| Mes de prueba con margen recomendado vs. compra tradicional | −31 % de compra, −81 % de sobrante, demanda no cubierta 0.56 % vs. 1.05 % | ídem |
-| Backtesting de la última semana (46 insumos) | Merma −76.6 %: 95 kg y $7,256 MXN evitados | [`docs/04_backend_api.md`](docs/04_backend_api.md) |
+| Error del modelo en el mes de prueba (nunca visto) | MAE 13.9 comensales (R² 0.83); error medio por insumo 11.0 %. La regresión lineal *one-hot* es mejor en estos datos simulados (9.7 %) y lo reportamos | [`docs/03_modelo_ml.md`](docs/03_modelo_ml.md) |
+| Mes de prueba con margen recomendado vs. compra tradicional | −34 % de compra, −82 % de sobrante, demanda no cubierta 0.96 % vs. 1.51 % | ídem |
+| Historial completo, 305 días comparables (46 insumos) | $915 mil menos en compras (−29.8 %), merma −72.4 %, demanda no cubierta 0.98 % vs. 1.00 % | [`docs/04_backend_api.md`](docs/04_backend_api.md) |
+| Backtesting de la última semana (con Buen Fin) | Merma −84.9 %: 147 kg y $10,819 MXN evitados; esa semana la compra tradicional cubrió mejor la demanda (0.04 % vs. 1.03 % sin cubrir) | ídem |
 | Rescate en menú (ejemplo) | 3 promociones rentables sobre $1,891 MXN de insumos críticos | [`docs/06_integracion_gemini.md`](docs/06_integracion_gemini.md) |
 
 > Son resultados de un método real sobre datos **SIMULADOS**: demuestran que el sistema funciona, no prometen ese ahorro en un restaurante real.
@@ -176,10 +185,10 @@ Hackateate_2026/
 ├── README.md · requirements.txt · .env.example
 ├── data/        schema.sql · generar_datos.py  →  restaurante.db (se genera)
 ├── ml/          modelo_demanda.py               →  modelo_rf.pkl (se genera)
-├── backend/     main.py · database.py · gemini_service.py · services/ (rescate_menu, alerta_excedente)
+├── backend/     main.py · database.py · gemini_service.py · services/ (rescate_menu, alerta_excedente, historial_compras)
 ├── frontend/    index.html · app.js · datos_demo.js
-├── scripts/     exportar_datos_demo.py · prueba_humo.py
-├── tests/       56 pruebas automáticas (unittest)
+├── scripts/     exportar_datos_demo.py · exportar_csv.py · prueba_humo.py
+├── tests/       64 pruebas automáticas (unittest)
 ├── docs/        documentación por apartado
 └── prueba1/     primer prototipo visual (referencia; cifras ilustrativas)
 ```

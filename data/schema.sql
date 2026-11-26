@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS recetas (
 
 -- -----------------------------------------------------------------------------
 -- Contexto diario: una fila por día con las variables que usa el modelo de ML
--- (calendario, clima, quincena, eventos) y la afluencia real (comensales).
+-- (calendario, quincena, días festivos, época del año, clima, eventos cercanos y
+-- eventos en la plaza) y la afluencia real (comensales).
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS contexto_diario (
     fecha                 TEXT    PRIMARY KEY,            -- 'YYYY-MM-DD'
@@ -75,10 +76,13 @@ CREATE TABLE IF NOT EXISTS contexto_diario (
     mes                   INTEGER NOT NULL CHECK (mes BETWEEN 1 AND 12),
     es_fin_de_semana      INTEGER NOT NULL CHECK (es_fin_de_semana IN (0, 1)),
     es_quincena           INTEGER NOT NULL CHECK (es_quincena IN (0, 1)),
+    es_dia_festivo        INTEGER NOT NULL CHECK (es_dia_festivo IN (0, 1)),
+    nombre_festivo        TEXT,                                   -- NULL si no es festivo
+    epoca_anio            TEXT    NOT NULL CHECK (epoca_anio IN ('regular', 'navidena', 'cuesta_enero', 'verano')),
     lluvia                INTEGER NOT NULL CHECK (lluvia IN (0, 1)),
     temperatura_c         REAL    NOT NULL,
     evento_cercano        INTEGER NOT NULL CHECK (evento_cercano IN (0, 1)),
-    temporada_vacacional  INTEGER NOT NULL CHECK (temporada_vacacional IN (0, 1)),
+    evento_plaza          INTEGER NOT NULL CHECK (evento_plaza IN (0, 1)),   -- Buen Fin, exposición, concierto en la plaza
     comensales            INTEGER NOT NULL CHECK (comensales >= 0),
     origen_dato           TEXT    NOT NULL DEFAULT 'SIMULADO' CHECK (origen_dato IN ('SIMULADO', 'REAL'))
 );

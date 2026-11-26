@@ -133,6 +133,18 @@ def _():
     return f"merma {t['reduccion_merma_pct']} %, {t['merma_evitada_kg']} kg, ${t['merma_evitada_mxn']:,.0f}"
 
 
+@caso("09 Historial de compras por mes (todos los productos y uno)")
+def _():
+    st, r = llamar("GET", "/api/historial-compras?agrupar=mes")
+    assert st == 200 and r["unidad"] == "MXN", f"{st} {r}"
+    assert r["serie"][0]["compra_sugerida"] is None, "los primeros días no deben tener predicción"
+    t = r["totales"]
+    st2, p = llamar("GET", "/api/historial-compras?agrupar=semana&insumo=pollo")
+    assert st2 == 200 and p["unidad"] == "kg", f"{st2}"
+    return (f"{len(r['serie'])} meses · ahorro en compras ${t['ahorro_compra_mxn']:,.0f} · merma {t['reduccion_merma_pct']} % · "
+            f"pollo: {len(p['serie'])} semanas")
+
+
 if __name__ == "__main__":
     print(f"Prueba de humo contra {BASE}\n")
     for nombre, ok, detalle in resultados:

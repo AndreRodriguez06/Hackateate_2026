@@ -52,14 +52,20 @@ RUTA_METRICAS = Path(__file__).resolve().parent / "metricas.json"
 
 # Variables de entrada del modelo (columnas de contexto_diario).
 # Son las que el encargado conoce ANTES de comprar: calendario, pronóstico y eventos.
-VARIABLES = ["dia_semana", "es_quincena", "lluvia", "evento_cercano", "temporada_vacacional"]
+VARIABLES = ["dia_semana", "es_quincena", "lluvia", "evento_cercano", "evento_plaza", "es_dia_festivo", "epoca"]
 NOMBRES_VARIABLES = {
     "dia_semana": "Día de la semana",
     "es_quincena": "Quincena",
     "lluvia": "Lluvia",
     "evento_cercano": "Evento cercano",
-    "temporada_vacacional": "Vacaciones escolares",
+    "evento_plaza": "Evento en la plaza",
+    "es_dia_festivo": "Día festivo",
+    "epoca": "Época del año",
 }
+# Época del año codificada como número (mismo orden que data/generar_datos.py: EPOCAS).
+EPOCAS = ["regular", "navidena", "cuesta_enero", "verano"]
+MIN_DIAS_HISTORICO = 60      # el historial fuera de muestra empieza cuando hay 2 meses para entrenar
+PASO_HISTORICO = 30          # se reentrena cada 30 días (ventana creciente)
 
 DIAS_PRUEBA = 30            # "último mes" del holdout temporal
 MARGEN_MINIMO_SEGURO = 0.04  # por debajo de 4 % hay riesgo de desabasto
@@ -67,9 +73,11 @@ MARGEN_MAXIMO = 0.25
 SEMILLA = 42
 
 HIPERPARAMETROS = {
+    # Elegidos con TimeSeriesSplit SOLO sobre el periodo de entrenamiento (docs/03_modelo_ml.md, sección 4.3).
     "n_estimators": 300,      # número de árboles
-    "min_samples_leaf": 3,    # cada hoja promedia al menos 3 días: evita memorizar el ruido
-    "max_features": 1.0,      # con solo 5 variables, cada árbol puede ver todas
+    "max_features": 0.33,     # cada división mira 1/3 de las variables: árboles más distintos entre sí
+    "max_depth": 10,          # limita la profundidad para no memorizar el ruido diario
+    "min_samples_leaf": 1,
     "random_state": SEMILLA,
     "n_jobs": -1,
 }
@@ -99,7 +107,11 @@ def cargar_datos(ruta_db: Path = RUTA_DB) -> dict:
     insumos = [dict(r) for r in con.execute(
         "SELECT id, clave, nombre, unidad, precio_unitario_mxn FROM insumos ORDER BY id")]
     dias = [dict(r) for r in con.execute(
-        f"SELECT fecha, comensales, {', '.join(VARIABLES)} FROM contexto_diario ORDER BY fecha")]
+        "SELECT fecha, comensales, dia_semana, es_quincena, lluvia, evento_cercano, evento_plaza,"
+        " es_dia_festivo, epoca_anio FROM contexto_diario ORDER BY fecha")]
+    for d in dias:
+        d["epoca"] = EPOCAS.index(d["epoca_anio"])
+    fila_meta = con.execute("SELECT valor FROM meta_dataset WHERE clave = 'generado_en'").fetchone()
 
     # Consumo y compra tradicional por (fecha, insumo)
     consumo, compra_trad = {}, {}
@@ -114,15 +126,49 @@ def cargar_datos(ruta_db: Path = RUTA_DB) -> dict:
     T = np.array([[compra_trad[(f, i["id"])] for i in insumos] for f in fechas])
 
     return {"fechas": fechas, "X": X, "Y": Y, "compra_tradicional": T,
-            "insumos": insumos, "origen_dato": "+".join(sorted(origenes))}
+            "insumos": insumos, "origen_dato": "+".join(sorted(origenes)),
+            "dataset_generado_en": fila_meta[0] if fila_meta else None}
 
 
 # =============================================================================
 # 2. VALIDACIÓN TEMPORAL Y MÉTRICAS
 # =============================================================================
 
-def _nuevo_rf() -> RandomForestRegressor:
-    return RandomForestRegressor(**HIPERPARAMETROS)
+class RandomForestRelativo:
+    """
+    Random Forest que aprende el ÍNDICE RELATIVO al promedio de cada día de la semana.
+
+    1. base[d] = consumo promedio histórico del día de la semana d (lunes, martes, ...).
+    2. El Random Forest aprende  y / base[d]  (1.20 = 20 % arriba de un día normal).
+    3. Predicción = índice predicho × base[d].
+
+    Así un festivo o un evento que ocurrió un martes también enseña al modelo qué pasa
+    si ocurre un sábado: los efectos se comparten entre días. Se eligió frente al
+    Random Forest directo con validación cruzada temporal sobre el periodo de entrenamiento.
+    """
+
+    def __init__(self, **parametros):
+        self.parametros = parametros
+
+    def fit(self, X: np.ndarray, Y: np.ndarray) -> "RandomForestRelativo":
+        dias = X[:, 0].astype(int)
+        promedio_general = Y.mean(axis=0)
+        self.base_ = np.array([Y[dias == d].mean(axis=0) if (dias == d).any() else promedio_general
+                               for d in range(7)])
+        self.base_ = np.maximum(self.base_, 1e-9)
+        self.rf_ = RandomForestRegressor(**self.parametros).fit(X, Y / self.base_[dias])
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self.rf_.predict(X) * self.base_[X[:, 0].astype(int)]
+
+    @property
+    def feature_importances_(self) -> np.ndarray:
+        return self.rf_.feature_importances_
+
+
+def _nuevo_rf() -> RandomForestRelativo:
+    return RandomForestRelativo(**HIPERPARAMETROS)
 
 
 def _metricas(y_real: np.ndarray, y_pred: np.ndarray) -> dict:
@@ -173,8 +219,8 @@ def validar(datos: dict, margen_referencia: float = 0.08) -> dict:
     lin = LinearRegression().fit(X_ent, Y_ent)
     met_lin = _metricas(Y_pru, lin.predict(X_pru))
     # Regresión lineal "bien hecha": día de la semana en 7 columnas (one-hot).
-    def one_hot(M):
-        return np.hstack([np.eye(7)[M[:, 0].astype(int)], M[:, 1:]])
+    def one_hot(M):  # día y época en columnas separadas; el resto ya es 0/1
+        return np.hstack([np.eye(7)[M[:, 0].astype(int)], M[:, 1:-1], np.eye(len(EPOCAS))[M[:, -1].astype(int)]])
     lin_oh = LinearRegression().fit(one_hot(X_ent), Y_ent)
     met_lin_oh = _metricas(Y_pru, lin_oh.predict(one_hot(X_pru)))
     met_prom = _metricas(Y_pru, _promedio_por_dia(X_ent, Y_ent, X_pru))
@@ -255,7 +301,25 @@ def validar(datos: dict, margen_referencia: float = 0.08) -> dict:
 # 3. ENTRENAMIENTO FINAL Y GUARDADO
 # =============================================================================
 
-def importancias_en_porcentaje(modelo: RandomForestRegressor) -> list[dict]:
+def predicciones_historicas(datos: dict, margenes: np.ndarray) -> dict:
+    """
+    Compra que habría sugerido ZeroMerma AI para CADA día del historial, sin ver ese día:
+    ventana creciente, se reentrena cada 30 días con todo lo anterior (primeros 60 días: sin dato).
+    compra_sugerida = predicción × (1 + margen recomendado del insumo).
+    """
+    X, Y = datos["X"], datos["Y"]
+    n = len(X)
+    sugerida = np.full((n, Y.shape[1] - 1), np.nan)
+    for inicio in range(MIN_DIAS_HISTORICO, n, PASO_HISTORICO):
+        fin = min(inicio + PASO_HISTORICO, n)
+        pred = _nuevo_rf().fit(X[:inicio], Y[:inicio]).predict(X[inicio:fin])[:, 1:]
+        sugerida[inicio:fin] = np.maximum(pred, 0) * (1 + margenes)
+    return {"fechas": datos["fechas"], "compra_sugerida": np.round(sugerida, 3),
+            "primer_dia_comparable": datos["fechas"][MIN_DIAS_HISTORICO] if n > MIN_DIAS_HISTORICO else None,
+            "nota": "Fuera de muestra: cada bloque de 30 días se predice con un modelo entrenado solo con días anteriores."}
+
+
+def importancias_en_porcentaje(modelo: RandomForestRelativo) -> list[dict]:
     """feature_importances_ como porcentajes con 1 decimal que suman exactamente 100."""
     pct = modelo.feature_importances_ * 100
     redondeado = np.round(pct, 1)
@@ -272,6 +336,8 @@ def entrenar(ruta_db: Path = RUTA_DB, ruta_modelo: Path = RUTA_MODELO,
 
     # Una vez validado, el modelo que se usa en producción aprende de TODO el historial.
     modelo = _nuevo_rf().fit(datos["X"], datos["Y"])
+    margenes = validacion["_margen_p90"]
+    historico = predicciones_historicas(datos, np.array([margenes[i["clave"]] for i in datos["insumos"]]))
 
     # Compra tradicional típica por insumo y día de la semana (para comparar en la UI).
     trad_por_dia = {}
@@ -286,6 +352,8 @@ def entrenar(ruta_db: Path = RUTA_DB, ruta_modelo: Path = RUTA_MODELO,
         "insumos": {i["clave"]: i for i in datos["insumos"]},
         "compra_tradicional_por_dia": trad_por_dia,
         "margen_recomendado_p90": validacion.pop("_margen_p90"),
+        "historico": historico,
+        "dataset_generado_en": datos["dataset_generado_en"],
         "importancias": importancias_en_porcentaje(modelo),
         "metricas": validacion,
         "hiperparametros": {k: v for k, v in HIPERPARAMETROS.items() if k != "n_jobs"},
@@ -360,8 +428,8 @@ def _resolver_insumo(paquete: dict, insumo: str) -> dict:
 
 
 def predecir_compra(insumo: str, dia_semana: int, es_quincena: bool, lluvia: bool, evento: bool,
-                    margen_seguridad: float, temporada_vacacional: bool = False,
-                    ruta_modelo: Path = RUTA_MODELO) -> dict:
+                    margen_seguridad: float, evento_plaza: bool = False, es_dia_festivo: bool = False,
+                    epoca: str = "regular", ruta_modelo: Path = RUTA_MODELO) -> dict:
     """
     Predice cuánto comprar de un insumo para un día.
 
@@ -369,7 +437,8 @@ def predecir_compra(insumo: str, dia_semana: int, es_quincena: bool, lluvia: boo
     ----------
     insumo:               clave ('pollo') o nombre ('Pechuga de pollo')
     dia_semana:           0 = lunes ... 6 = domingo
-    es_quincena, lluvia, evento, temporada_vacacional: contexto del día
+    es_quincena, lluvia, evento (cercano), evento_plaza, es_dia_festivo: contexto del día
+    epoca:                "regular", "navidena", "cuesta_enero" o "verano"
     margen_seguridad:     fracción entre 0 y 0.25 (0.08 = 8 %)
 
     Regla de negocio
@@ -382,12 +451,15 @@ def predecir_compra(insumo: str, dia_semana: int, es_quincena: bool, lluvia: boo
     if not 0 <= margen_seguridad <= MARGEN_MAXIMO:
         raise ValueError(f"margen_seguridad debe estar entre 0 y {MARGEN_MAXIMO}")
 
+    if epoca not in EPOCAS:
+        raise ValueError(f"epoca debe ser una de {EPOCAS}")
+
     paquete = cargar_modelo(ruta_modelo)
     info = _resolver_insumo(paquete, insumo)
     clave = info["clave"]
 
-    fila = np.array([[int(dia_semana), int(bool(es_quincena)), int(bool(lluvia)),
-                      int(bool(evento)), int(bool(temporada_vacacional))]], dtype=float)
+    fila = np.array([[int(dia_semana), int(bool(es_quincena)), int(bool(lluvia)), int(bool(evento)),
+                      int(bool(evento_plaza)), int(bool(es_dia_festivo)), EPOCAS.index(epoca)]], dtype=float)
     prediccion = paquete["modelo"].predict(fila)[0]
     comensales = max(0, round(float(prediccion[0])))
     demanda_base = max(0.0, float(prediccion[paquete["salidas"].index(clave)]))
@@ -474,6 +546,7 @@ def main(argv: list[str] | None = None) -> int:
 
     e = sub.add_parser("entrenar", help="Valida, entrena y guarda ml/modelo_rf.pkl")
     e.add_argument("--db", type=Path, default=RUTA_DB)
+    e.add_argument("--modelo", type=Path, default=RUTA_MODELO, help="Dónde guardar el .pkl")
 
     pr = sub.add_parser("predecir", help="Calcula la compra sugerida de un insumo")
     pr.add_argument("--insumo", required=True)
@@ -481,7 +554,9 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--quincena", action="store_true")
     pr.add_argument("--lluvia", action="store_true")
     pr.add_argument("--evento", action="store_true")
-    pr.add_argument("--vacaciones", action="store_true")
+    pr.add_argument("--plaza", action="store_true", help="Evento en la plaza")
+    pr.add_argument("--festivo", action="store_true", help="Día festivo")
+    pr.add_argument("--epoca", default="regular", choices=EPOCAS)
     pr.add_argument("--margen", type=float, default=0.08)
 
     sub.add_parser("importancias", help="Muestra la importancia de variables del modelo guardado")
@@ -489,10 +564,10 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     try:
         if args.comando == "entrenar":
-            entrenar(args.db)
+            entrenar(args.db, args.modelo)
         elif args.comando == "predecir":
             r = predecir_compra(args.insumo, args.dia, args.quincena, args.lluvia, args.evento,
-                                args.margen, args.vacaciones)
+                                args.margen, args.plaza, args.festivo, args.epoca)
             print(json.dumps(r, ensure_ascii=False, indent=2))
         else:
             print(json.dumps(cargar_modelo()["importancias"], ensure_ascii=False, indent=2))
@@ -503,4 +578,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Se ejecuta desde el módulo `ml.modelo_demanda` (no como `__main__`) para que el modelo
+    # guardado referencie `ml.modelo_demanda.RandomForestRelativo` y el backend pueda leerlo.
+    sys.path.insert(0, str(RAIZ))
+    from ml import modelo_demanda as _modulo
+    sys.exit(_modulo.main())
