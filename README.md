@@ -23,7 +23,7 @@ Requiere Python 3.10 o superior. No hace falta instalar paquetes todavía.
 
 ```bash
 python data/generar_datos.py              # crea data/zeromerma.db con datos SIMULADOS
-python -m unittest discover -s tests -v   # 9 pruebas del generador
+python -m unittest discover -s tests -v   # 10 pruebas del generador
 ```
 
 El prototipo visual se abre con doble clic en `prueba1/index.html`.

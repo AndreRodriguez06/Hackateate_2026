@@ -53,6 +53,13 @@ class TestGenerarDatos(unittest.TestCase):
                         "(julianday(fecha_caducidad) - julianday('now','localtime')) * 24 < 24")
         self.assertGreaterEqual(n, 2)
 
+    def test_menu_de_30_platillos_con_catalogo_consistente(self):
+        self.assertEqual(self.contar("SELECT COUNT(*) FROM platillos"), 30)
+        self.assertEqual(generar_datos.verificar_catalogo(), [])
+        # Cada insumo se usa en al menos una receta.
+        self.assertEqual(self.contar("SELECT COUNT(*) FROM insumos WHERE id NOT IN "
+                                     "(SELECT DISTINCT insumo_id FROM recetas)"), 0)
+
     def test_cada_platillo_tiene_receta(self):
         self.assertEqual(self.contar("SELECT COUNT(*) FROM platillos WHERE id NOT IN "
                                      "(SELECT DISTINCT platillo_id FROM recetas)"), 0)

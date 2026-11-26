@@ -194,7 +194,7 @@ Entrada:
 Salida:
 ```json
 { "modo": "gemini",
-  "insumos_criticos": ["pollo", "crema", "bolillo"],
+  "insumos_criticos": ["pollo", "crema", "bolillo", "carne_molida"],
   "estrategias": [ {
       "platillo_clave": "enchiladas_suizas", "platillo": "Enchiladas Suizas",
       "tipo": "descuento", "descuento_pct": 25, "precio_normal_mxn": 120, "precio_oferta_mxn": 90,
