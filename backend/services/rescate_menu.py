@@ -6,7 +6,7 @@ Cruza los insumos a punto de caducar con el recetario y propone promociones
 SOLO sobre platillos que ya existen en el menú.
 
 Dos modos:
-  * "gemini":   el servicio del Apartado 6 (backend/services/gemini_service.py) elige
+  * "gemini":   backend/gemini_service.py (Apartado 6) elige
                 platillos, descuentos y redacta el texto. El backend NO confía en sus
                 cuentas: valida cada propuesta y recalcula todas las cifras aquí.
   * "fallback": reglas deterministas de este archivo. Se usa si Gemini no está
@@ -19,13 +19,13 @@ Supuestos de negocio (SIMULADOS, documentados en docs/04_backend_api.md):
 
 from __future__ import annotations
 
-import importlib
 import json
 import math
 import sqlite3
 from datetime import datetime
 
 from backend import database as db
+from backend import gemini_service
 
 DESCUENTOS_POSIBLES = (30, 25, 20, 15, 10)   # en %, de mayor a menor
 FACTOR_COSTO_MINIMO = 1.5                    # precio_oferta >= 1.5 × costo por porción
@@ -156,6 +156,7 @@ def validar_propuestas(propuestas: list[dict], platillos: dict, criticos: dict, 
         est = calcular_estrategia(p, d, porciones_con_promocion(ventas.get(p["clave"], 1.0), d), disponibles, insumos)
         est["tipo"] = str(prop.get("tipo") or "descuento")
         est["copy_promocional"] = str(prop.get("copy_promocional") or copy_por_plantilla(est))[:400]
+        est["justificacion"] = str(prop.get("justificacion") or "")[:300]
         validas.append(est)
         for r in est["insumos_rescatados"]:
             disponibles[r["clave"]] = max(0.0, disponibles[r["clave"]] - r["cantidad"])
@@ -173,16 +174,19 @@ def optimizar_menu(con: sqlite3.Connection, ahora: datetime, horas_umbral: float
     lotes = db.listar_lotes(con, ahora)
     # Nunca se promociona comida caducada: solo lotes vigentes dentro del umbral.
     criticos: dict[str, float] = {}
+    horas_min: dict[str, float] = {}
     for lote in lotes:
         if not lote["caducado"] and lote["horas_restantes"] <= horas_umbral:
             criticos[lote["clave"]] = criticos.get(lote["clave"], 0.0) + lote["cantidad"]
+            horas_min[lote["clave"]] = min(horas_min.get(lote["clave"], 1e9), lote["horas_restantes"])
 
     insumos = db.insumos_por_clave(con)
     resumen_criticos = [{"clave": k, "nombre": insumos[k]["nombre"], "cantidad": round(v, 3),
-                         "unidad": insumos[k]["unidad"],
+                         "unidad": insumos[k]["unidad"], "costo_unitario_mxn": insumos[k]["precio_unitario_mxn"],
+                         "horas_restantes": horas_min[k],
                          "valor_mxn": round(v * insumos[k]["precio_unitario_mxn"], 2)}
                         for k, v in criticos.items()]
-    respuesta = {"modo": "fallback", "motivo_fallback": None, "insumos_criticos": resumen_criticos,
+    respuesta = {"modo": "fallback", "motivo_fallback": None, "modelo": None, "insumos_criticos": resumen_criticos,
                  "estrategias": [], "origen_dato": db.origen_dataset(con)}
     if not criticos:
         respuesta["motivo_fallback"] = f"No hay insumos vigentes a menos de {horas_umbral:g} h de caducar."
@@ -192,25 +196,22 @@ def optimizar_menu(con: sqlite3.Connection, ahora: datetime, horas_umbral: float
     ventas = db.ventas_promedio(con, dia_semana=ahora.weekday())
 
     estrategias, motivo = None, None
-    if usar_gemini:
-        try:
-            gemini_service = importlib.import_module("backend.services.gemini_service")  # Apartado 6
-            propuestas = gemini_service.proponer_promociones(
-                insumos_criticos=resumen_criticos,
-                platillos=[{k: p[k] for k in ("clave", "nombre", "categoria", "precio_venta_mxn",
-                                               "costo_porcion_mxn", "receta")}
-                           for p in platillos.values() if any(c in p["receta"] for c in criticos)],
-                ventas_promedio=ventas, max_estrategias=max_estrategias)
-            estrategias = validar_propuestas(propuestas, platillos, criticos, insumos, ventas, max_estrategias)
-            respuesta["modo"] = "gemini"
-        except ModuleNotFoundError as err:
-            motivo = ("El servicio de Gemini aún no está integrado (Apartado 6)."
-                      if err.name == "backend.services.gemini_service"
-                      else f"Falta una dependencia de Gemini: {err.name}")
-        except Exception as err:  # cuota agotada, sin llave, red, JSON inválido, validación...
-            motivo = f"Gemini no disponible o respuesta inválida: {err}"
+    resultado = gemini_service.generar_promociones_menu(
+        resumen_criticos,
+        [{k: p[k] for k in ("clave", "nombre", "categoria", "precio_venta_mxn", "costo_porcion_mxn", "receta")}
+         for p in platillos.values()],
+        max_estrategias, usar_gemini=usar_gemini)
+    if resultado["modo_respaldo"] or not resultado["promociones"]:
+        motivo = resultado["motivo_respaldo"] or "Gemini no propuso promociones."
     else:
-        motivo = "Se pidió no usar Gemini."
+        try:
+            # Segunda validación, ahora con existencias y ventas: las cifras se recalculan aquí.
+            estrategias = validar_propuestas(resultado["promociones"], platillos, criticos, insumos, ventas,
+                                             max_estrategias)
+            respuesta["modo"] = "gemini"
+            respuesta["modelo"] = resultado["modelo"]
+        except ValueError as err:
+            motivo = f"La propuesta de Gemini no pasó la validación del backend: {err}"
 
     if estrategias is None:
         estrategias = estrategias_por_reglas(platillos, criticos, insumos, ventas, max_estrategias)

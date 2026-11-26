@@ -12,17 +12,22 @@ Supuestos (SIMULADOS, documentados en docs/04_backend_api.md):
     (se vende un poco más rápido al inicio que al final).
   * La cocina prepara 10 % más que la venta promedio del mismo día de la semana.
   * Ritmo: lento = 70 % de lo normal (−30 %), normal = 100 %, rápido = 115 %.
+  * Ventana de recolección: empieza 1 h después del aviso y termina al menos 2 h antes
+    del cierre (18:00), para que el comedor alcance a distribuir la comida el mismo día.
+
+La ficha (texto, recomendaciones de inocuidad) la redacta Gemini a través de
+backend/gemini_service.py; si no está disponible, ese módulo devuelve un respaldo.
 """
 
 from __future__ import annotations
 
-import importlib
 import json
 import math
 import sqlite3
 from datetime import datetime
 
 from backend import database as db
+from backend import gemini_service
 
 APERTURA = 9.0
 CIERRE = 20.0
@@ -30,7 +35,9 @@ EXPONENTE_CURVA = 0.8
 COLCHON_PREPARACION = 1.10
 RITMOS = {"lento": 0.70, "normal": 1.00, "rapido": 1.15}
 SOBRANTE_MINIMO = 3            # porciones; por debajo se aprovecha en comida del personal
-HORAS_ANTICIPACION = 1.5       # la recolección empieza 1.5 h después del aviso
+HORAS_ANTICIPACION = 1.0       # la recolección empieza 1 h después del aviso
+HORAS_LIMITE_ANTES_CIERRE = gemini_service.HORAS_MINIMAS_ANTES_CIERRE   # 2 h
+VENTANA_MINIMA = 0.5           # una ventana de menos de 30 min no es operable
 CATEGORIAS_REFRIGERAR = {"proteína", "lácteo"}
 
 
@@ -57,28 +64,21 @@ def _redondear_arriba_15(h: float) -> float:
     return math.ceil(h * 4 - 1e-9) / 4
 
 
-def ventana_recoleccion(h: float) -> tuple[float, float]:
-    """Ventana para recoger: empieza 1.5 h después del aviso y termina antes del cierre."""
-    inicio = _redondear_arriba_15(h + HORAS_ANTICIPACION)
-    fin = min(max(CIERRE - 1.5, inicio + 1.0), CIERRE - 0.25)
-    if fin <= inicio:  # ya es tarde: recolección inmediata hasta el cierre
-        inicio, fin = _redondear_arriba_15(h + 0.25), CIERRE
-    return inicio, fin
+def ventana_recoleccion(h: float, cierre: float = CIERRE) -> tuple[float, float] | None:
+    """
+    Ventana para recoger: empieza 1 h después del aviso (o en 15 min si ya es tarde) y
+    termina al menos 2 h antes del cierre. None si ya no cabe una ventana de 30 min.
+    """
+    limite = cierre - HORAS_LIMITE_ANTES_CIERRE
+    for anticipacion in (HORAS_ANTICIPACION, 0.25):
+        inicio = _redondear_arriba_15(h + anticipacion)
+        if limite - inicio >= VENTANA_MINIMA - 1e-9:
+            return inicio, limite
+    return None
 
 
-def nota_inocuidad(platillo: dict, insumos: dict) -> str:
-    categorias = {insumos[k]["categoria"] for k in platillo["receta"]}
-    if categorias & CATEGORIAS_REFRIGERAR:
-        return ("Mantener en refrigeración a 4 °C o menos hasta la entrega; transportar en contenedor "
-                "cerrado y consumir el mismo día. No recalentar más de una vez.")
-    return "Conservar tapado y en lugar fresco; consumir el mismo día."
-
-
-def mensaje_por_plantilla(ficha: dict) -> str:
-    return (f"Hola, somos Cafetería La Esquina. Hoy tendremos {ficha['porciones']} porciones de "
-            f"{ficha['platillo']} (aprox. {ficha['cantidad_aprox_kg']} kg) disponibles para donación. "
-            f"Pueden recogerlas entre {ficha['ventana_recoleccion']['inicio']} y "
-            f"{ficha['ventana_recoleccion']['fin']}. {ficha['nota_inocuidad']}")
+def requiere_refrigeracion(platillo: dict, insumos: dict) -> bool:
+    return bool({insumos[k]["categoria"] for k in platillo["receta"]} & CATEGORIAS_REFRIGERAR)
 
 
 def evaluar(con: sqlite3.Connection, ahora: datetime, platillo_clave: str, hora_actual: str,
@@ -140,46 +140,45 @@ def evaluar(con: sqlite3.Connection, ahora: datetime, platillo_clave: str, hora_
             "hora_agotamiento_estimada": agotamiento,
         },
         "alerta_activa": sobrante >= SOBRANTE_MINIMO,
+        "ventana_viable": ventana_recoleccion(h) is not None,
         "ficha": None,
+        "motivo_sin_ficha": None,
         "origen_dato": db.origen_dataset(con),
     }
     if not respuesta["alerta_activa"] or not generar_ficha:
         return respuesta
 
-    inicio, fin = ventana_recoleccion(h)
-    ficha = {
-        "alimento": f"{sobrante} porciones de {platillo['nombre']}",
-        "platillo": platillo["nombre"],
-        "porciones": sobrante,
-        "cantidad_aprox_kg": round(sobrante * platillo["peso_porcion_kg"], 1),
-        "ventana_recoleccion": {"inicio": decimal_a_hora(inicio), "fin": decimal_a_hora(fin),
-                                "horas_antes_del_cierre": round(CIERRE - inicio, 2)},
-        "nota_inocuidad": nota_inocuidad(platillo, insumos),
-        "destinatario_sugerido": "Comedor comunitario / Red Campus",
-        "mensaje": None,
-    }
+    resultado = gemini_service.generar_alerta_recoleccion(
+        {"producto": platillo["nombre"], "porciones": sobrante,
+         "cantidad_aprox_kg": round(sobrante * platillo["peso_porcion_kg"], 1),
+         "requiere_refrigeracion": requiere_refrigeracion(platillo, insumos),
+         "punto_entrega": "Cafetería La Esquina (andén de servicio)"},
+        decimal_a_hora(h), decimal_a_hora(CIERRE), usar_gemini=usar_gemini)
+    respuesta["modo"] = "fallback" if resultado["modo_respaldo"] else "gemini"
+    respuesta["motivo_fallback"] = resultado["motivo_respaldo"]
+    if resultado["ficha"] is None:
+        respuesta["motivo_sin_ficha"] = resultado["motivo_sin_ficha"]
+        return respuesta
 
-    mensaje = None
-    if usar_gemini:
-        try:
-            gemini_service = importlib.import_module("backend.services.gemini_service")  # Apartado 6
-            mensaje = str(gemini_service.redactar_ficha(ficha))[:600]
-            respuesta["modo"] = "gemini"
-        except ModuleNotFoundError as err:
-            respuesta["motivo_fallback"] = ("El servicio de Gemini aún no está integrado (Apartado 6)."
-                                            if err.name == "backend.services.gemini_service"
-                                            else f"Falta una dependencia de Gemini: {err.name}")
-        except Exception as err:
-            respuesta["motivo_fallback"] = f"Gemini no disponible: {err}"
-    else:
-        respuesta["motivo_fallback"] = "Se pidió no usar Gemini."
-    ficha["mensaje"] = mensaje or mensaje_por_plantilla(ficha)
+    f = resultado["ficha"]
+    ficha = {
+        "alimento": f"{f['porciones']} porciones de {f['producto']}",
+        "platillo": f["producto"],
+        "porciones": f["porciones"],
+        "cantidad_aprox_kg": f["cantidad_aprox_kg"],
+        "ventana_recoleccion": {"inicio": f["ventana_inicio"], "fin": f["ventana_limite"],
+                                "horas_antes_del_cierre": f["horas_antes_del_cierre"]},
+        "recomendaciones_inocuidad": f["recomendaciones_inocuidad"],
+        "nota_inocuidad": " ".join(f["recomendaciones_inocuidad"]),
+        "destinatario_sugerido": "Comedor comunitario / Red Campus",
+        "mensaje": f["mensaje"],
+    }
     respuesta["ficha"] = ficha
 
     cur = con.execute(
         "INSERT INTO alertas_excedente (creado_en, modo, platillo_id, porciones_excedentes, ventana_inicio,"
         " ventana_fin, ficha_json, enviada, origen_dato) VALUES (?,?,?,?,?,?,?,0,'SIMULADO')",
-        (ahora.replace(microsecond=0).isoformat(), respuesta["modo"], platillo["id"], sobrante,
+        (ahora.replace(microsecond=0).isoformat(), respuesta["modo"], platillo["id"], ficha["porciones"],
          ficha["ventana_recoleccion"]["inicio"], ficha["ventana_recoleccion"]["fin"],
          json.dumps(ficha, ensure_ascii=False)))
     con.commit()

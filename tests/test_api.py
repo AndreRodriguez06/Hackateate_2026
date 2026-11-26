@@ -5,23 +5,29 @@ Ejecutar desde la raíz del repo:
 Usa una base y un modelo temporales: no toca data/restaurante.db ni ml/modelo_rf.pkl.
 """
 import os
-import sys
 import tempfile
-import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _TMP = tempfile.TemporaryDirectory()
 os.environ["ZEROMERMA_DB"] = str(Path(_TMP.name) / "restaurante.db")
 os.environ["ZEROMERMA_MODELO"] = str(Path(_TMP.name) / "modelo_rf.pkl")
+os.environ["GEMINI_API_KEY"] = ""   # las pruebas nunca llaman a la API real, aunque exista un .env
 
 from fastapi.testclient import TestClient  # noqa: E402
 
 from backend import database as db  # noqa: E402
+from backend import gemini_service  # noqa: E402
 from backend.main import app  # noqa: E402
 from backend.services import rescate_menu  # noqa: E402
 
-GEMINI = "backend.services.gemini_service"
+
+
+def gemini_falso(*promociones):
+    """Sustituye la llamada real a Gemini por una respuesta fija (no usa red ni llave)."""
+    respuesta = gemini_service.RespuestaPromociones(promociones=[gemini_service.PromocionGemini(**p) for p in promociones])
+    return mock.patch.object(gemini_service, "_generar", return_value=respuesta)
 
 
 class TestAPI(unittest.TestCase):
@@ -33,10 +39,6 @@ class TestAPI(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.cliente.__exit__(None, None, None)
-        sys.modules.pop(GEMINI, None)
-
-    def tearDown(self):
-        sys.modules.pop(GEMINI, None)
 
     # --- Arranque ---
     def test_arranque_prepara_datos_y_modelo(self):
@@ -98,25 +100,29 @@ class TestAPI(unittest.TestCase):
             self.assertGreaterEqual(e["precio_oferta_mxn"], 1.5 * e["costo_insumos_porcion_mxn"])
 
     def test_optimizar_menu_con_gemini_valido(self):
-        falso = types.ModuleType(GEMINI)
-        falso.proponer_promociones = lambda **kw: [{"platillo_clave": "enchiladas_suizas", "descuento_pct": 20,
-                                                    "tipo": "descuento", "copy_promocional": "Texto de prueba",
-                                                    "margen_recuperado_mxn": 999999}]
-        sys.modules[GEMINI] = falso
-        d = self.cliente.post("/api/optimizar-menu", json={"max_estrategias": 1}).json()
+        with gemini_falso({"platillo_clave": "enchiladas_suizas", "descuento_pct": 20,
+                           "insumos_criticos_usados": ["inventado"], "justificacion": "Usa pollo y crema.",
+                           "copy_promocional": "Texto de prueba"}):
+            d = self.cliente.post("/api/optimizar-menu", json={"max_estrategias": 1}).json()
         self.assertEqual(d["modo"], "gemini")
         e = d["estrategias"][0]
         self.assertEqual(e["copy_promocional"], "Texto de prueba")
-        self.assertNotEqual(e["margen_recuperado_mxn"], 999999)      # la cifra la recalcula el backend
-        self.assertEqual(e["precio_oferta_mxn"], 96)
+        self.assertEqual(e["justificacion"], "Usa pollo y crema.")
+        self.assertEqual(e["precio_oferta_mxn"], 96)                       # 120 × (1 − 20 %)
+        self.assertTrue(all(r["clave"] != "inventado" for r in e["insumos_rescatados"]))  # cifras del backend
 
     def test_optimizar_menu_rechaza_platillo_inventado(self):
-        falso = types.ModuleType(GEMINI)
-        falso.proponer_promociones = lambda **kw: [{"platillo_clave": "sushi_de_pollo", "descuento_pct": 20}]
-        sys.modules[GEMINI] = falso
+        with gemini_falso({"platillo_clave": "sushi_de_pollo", "descuento_pct": 20, "insumos_criticos_usados": [],
+                           "justificacion": "x", "copy_promocional": "x"}):
+            d = self.cliente.post("/api/optimizar-menu", json={}).json()
+        self.assertEqual(d["modo"], "fallback")
+        self.assertIn("fuera del menú", d["motivo_fallback"])
+        self.assertTrue(d["estrategias"])                                   # la demo sigue funcionando
+
+    def test_optimizar_menu_sin_llave_usa_respaldo(self):
         d = self.cliente.post("/api/optimizar-menu", json={}).json()
         self.assertEqual(d["modo"], "fallback")
-        self.assertIn("no está en el menú", d["motivo_fallback"])
+        self.assertIn("GEMINI_API_KEY", d["motivo_fallback"])
 
     def test_validacion_rechaza_descuento_no_rentable(self):
         platillo = {"clave": "x", "nombre": "X", "categoria": "plato fuerte", "precio_venta_mxn": 100.0,
@@ -132,10 +138,20 @@ class TestAPI(unittest.TestCase):
                                                               "porciones_preparadas": 40}).json()
         self.assertTrue(d["alerta_activa"])
         self.assertGreaterEqual(d["proyeccion"]["porciones_sobrantes"], 3)
-        self.assertEqual(d["ficha"]["ventana_recoleccion"]["inicio"], "16:30")
+        self.assertEqual(d["ficha"]["ventana_recoleccion"]["inicio"], "16:00")
+        self.assertEqual(d["ficha"]["ventana_recoleccion"]["fin"], "18:00")       # 2 h antes del cierre
+        self.assertGreaterEqual(len(d["ficha"]["recomendaciones_inocuidad"]), 2)
         self.assertTrue(d["ficha"]["mensaje"])
         enviada = self.cliente.post(f"/api/alerta-excedente/{d['alerta_id']}/enviar").json()
         self.assertTrue(enviada["envio_simulado"])
+
+    def test_alerta_tarde_sin_ventana_viable(self):
+        d = self.cliente.post("/api/alerta-excedente", json={"hora_actual": "17:45", "ritmo_ventas": "lento",
+                                                              "porciones_preparadas": 40}).json()
+        self.assertTrue(d["alerta_activa"])
+        self.assertFalse(d["ventana_viable"])
+        self.assertIsNone(d["ficha"])
+        self.assertIn("18:00", d["motivo_sin_ficha"])
 
     def test_alerta_solo_proyeccion_no_registra(self):
         d = self.cliente.post("/api/alerta-excedente", json={"hora_actual": "15:00", "ritmo_ventas": "lento",

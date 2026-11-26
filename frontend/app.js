@@ -137,6 +137,16 @@
     }
   }
 
+  /** Misma regla que el backend: empieza 1 h después (o 15 min si es tarde) y termina 2 h antes del cierre. */
+  function ventanaLocal(h, A) {
+    const limite = A.cierre - A.horas_limite_antes_cierre;
+    for (const anticipacion of [A.horas_anticipacion, 0.25]) {
+      const inicio = Math.ceil((h + anticipacion) * 4 - 1e-9) / 4;
+      if (limite - inicio >= A.ventana_minima - 1e-9) return [inicio, limite];
+    }
+    return null;
+  }
+
   // ---------------------------------------------------------------------------
   // Respaldos locales (modo demo): reproducen las respuestas de la API
   // ---------------------------------------------------------------------------
@@ -199,20 +209,25 @@
                       ventas_esperadas_al_cierre: cierre, porciones_sobrantes: sobrante, hora_agotamiento_estimada: agotamiento },
         alerta_activa: sobrante >= A.sobrante_minimo, ficha: null, alerta_id: null, es_simulado: true,
       };
+      const ventana = ventanaLocal(h, A);
+      r.ventana_viable = Boolean(ventana);
+      r.motivo_sin_ficha = null;
       if (r.alerta_activa && e.generar_ficha) {
-        let inicio = Math.ceil((h + 1.5) * 4 - 1e-9) / 4;
-        let fin = Math.min(Math.max(A.cierre - 1.5, inicio + 1), A.cierre - 0.25);
-        if (fin <= inicio) { inicio = Math.ceil((h + 0.25) * 4 - 1e-9) / 4; fin = A.cierre; }
-        const nota = p.refrigerar
-          ? 'Mantener en refrigeración a 4 °C o menos hasta la entrega; transportar en contenedor cerrado y consumir el mismo día. No recalentar más de una vez.'
-          : 'Conservar tapado y en lugar fresco; consumir el mismo día.';
+        if (!ventana) {
+          r.motivo_sin_ficha = `Ya no hay tiempo para una recolección segura: debe terminar al menos ${A.horas_limite_antes_cierre} h ` +
+            `antes del cierre (${hora24(A.cierre - A.horas_limite_antes_cierre)}). Aprovechen el excedente internamente.`;
+          return r;
+        }
+        const [inicio, fin] = ventana;
+        const recomendaciones = A.recomendaciones[p.refrigerar ? 'refrigerar' : 'ambiente'];
         const kg = Math.round(sobrante * p.peso_porcion_kg * 10) / 10;
         r.ficha = {
           alimento: `${sobrante} porciones de ${p.nombre}`, platillo: p.nombre, porciones: sobrante, cantidad_aprox_kg: kg,
-          ventana_recoleccion: { inicio: hora24(inicio), fin: hora24(fin), horas_antes_del_cierre: A.cierre - inicio },
-          nota_inocuidad: nota, destinatario_sugerido: 'Comedor comunitario / Red Campus',
-          mensaje: `Hola, somos Cafetería La Esquina. Hoy tendremos ${sobrante} porciones de ${p.nombre} (aprox. ${kg} kg) ` +
-                   `disponibles para donación. Pueden recogerlas entre ${hora24(inicio)} y ${hora24(fin)}. ${nota}`,
+          ventana_recoleccion: { inicio: hora24(inicio), fin: hora24(fin), horas_antes_del_cierre: A.cierre - fin },
+          recomendaciones_inocuidad: recomendaciones, nota_inocuidad: recomendaciones.join(' '),
+          destinatario_sugerido: 'Comedor comunitario / Red Campus',
+          mensaje: `Hola, somos Cafetería La Esquina. Hoy tenemos ${sobrante} porciones de ${p.nombre} (aprox. ${kg} kg) ` +
+                   `disponibles para donación. Pueden recogerlas entre ${hora24(inicio)} y ${hora24(fin)}. ${recomendaciones[0]}`,
         };
       }
       return r;
@@ -443,7 +458,7 @@
     $('#modoOptimizar').innerHTML = `
       <div class="rounded-xl border ${esGemini ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-white'} p-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <span class="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded-full text-xs font-semibold ${esGemini ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'}">
-          <i data-lucide="${esGemini ? 'sparkles' : 'list-checks'}" class="w-3.5 h-3.5"></i>${esGemini ? 'Generado con Gemini' : 'Reglas locales (fallback)'}</span>
+          <i data-lucide="${esGemini ? 'sparkles' : 'list-checks'}" class="w-3.5 h-3.5"></i>${esGemini ? `Generado con Gemini${r.modelo ? ' · ' + esc(r.modelo) : ''}` : 'Reglas locales (modo respaldo)'}</span>
         <p class="text-sm text-slate-600 flex-1">${esGemini ? 'Gemini eligió platillos y redactó el texto; el backend validó y recalculó todas las cifras.' : esc(r.motivo_fallback || '')}</p>
         <p class="text-sm tabular"><span class="text-slate-500">Insumos críticos:</span> <strong>${mxn(t.valor_critico_total_mxn || 0)}</strong></p>
       </div>`;
@@ -471,6 +486,7 @@
         <p class="text-sm text-slate-500 mt-1">Precio normal <s>$${num(e.precio_normal_mxn, 0)}</s> → <strong class="text-slate-900">Oferta $${num(e.precio_oferta_mxn, 0)}</strong>
           · costo de insumos $${num(e.costo_insumos_porcion_mxn, 2)} por porción</p>
         <p class="text-sm text-slate-600 mt-2">Meta: <strong>${e.porciones_objetivo} porciones</strong> · rescata ${rescatados}</p>
+        ${e.justificacion ? `<p class="text-xs text-slate-500 mt-2 flex gap-1.5"><i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5"></i><span>${esc(e.justificacion)}</span></p>` : ''}
         <div class="mt-4 space-y-3">
           <div>
             <div class="flex justify-between text-xs mb-1 gap-2"><span class="text-slate-600">Pérdida si se tira a la basura</span><span class="tabular font-semibold text-rose-600">−${mxn(e.perdida_si_se_tira_mxn)}</span></div>
@@ -553,8 +569,10 @@
               <p class="text-xs font-semibold uppercase tracking-wide text-orange-700">Alerta preventiva · ${hora12(textoAHora(r.hora_actual))} · confianza ${esc(r.confianza)}</p>
               <p class="mt-1 text-orange-950"><strong>Proyección de cierre:</strong> sobrarán <strong>${p.porciones_sobrantes} porciones</strong> de ${esc(r.platillo.nombre)} que no se venderán antes de las 8:00 PM.</p>
               <p class="mt-1 text-sm text-orange-800">Ritmo de ventas al ${Math.round(r.factor_ritmo * 100)} % de lo habitual. Avisar ahora deja más tiempo para recoger.</p>
-              <button id="botonFicha" type="button" class="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-orange-300 transition disabled:opacity-60">
-                📢 Generar Ficha de Rescate Temprano</button>
+              ${r.ventana_viable === false
+                ? `<p class="mt-3 text-sm font-medium text-orange-900 bg-white/60 rounded-lg p-3">Ya no hay tiempo para una recolección segura: debe terminar al menos 2 h antes del cierre (6:00 PM). Aprovechen el excedente internamente y avisen más temprano la próxima vez.</p>`
+                : `<button id="botonFicha" type="button" class="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-orange-300 transition disabled:opacity-60">
+                📢 Generar Ficha de Rescate Temprano</button>`}
             </div>
           </div>
         </div>`;
@@ -585,7 +603,7 @@
     const entrada = entradaAlerta(true);
     try {
       const { datos: r, fuente } = await conRespaldo(() => post('/api/alerta-excedente', entrada), () => local.alerta(entrada));
-      if (!r.ficha) { toast('Con estos datos ya no hay excedente suficiente para una ficha.', 'aviso'); return; }
+      if (!r.ficha) { toast(r.motivo_sin_ficha || 'Con estos datos ya no hay excedente suficiente para una ficha.', 'aviso'); return; }
       pintarDespacho(r, fuente);
     } catch (err) {
       mostrarError('#errorAlerta', `No se pudo generar la ficha: ${err.message}`);
@@ -602,16 +620,18 @@
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden fade-in">
         <div class="px-5 py-3 bg-slate-900 text-white flex items-center justify-between gap-3 flex-wrap">
           <p class="font-semibold flex items-center gap-2"><i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-400"></i> Ficha de Rescate Temprano</p>
-          <span class="text-xs text-slate-400">${r.alerta_id ? `Folio #${r.alerta_id}` : 'Folio local (demo)'} · ${r.modo === 'gemini' ? 'mensaje redactado con Gemini' : 'mensaje por plantilla'}</span>
+          <span class="text-xs text-slate-400">${r.alerta_id ? `Folio #${r.alerta_id}` : 'Folio local (demo)'} · ${r.modo === 'gemini' ? 'redactada con Gemini y validada' : 'plantilla de respaldo'}</span>
         </div>
+        ${r.modo !== 'gemini' && r.motivo_fallback ? `<p class="px-5 py-2 text-xs bg-slate-50 text-slate-500 border-b border-slate-100">Modo respaldo: ${esc(r.motivo_fallback)}</p>` : ''}
         <dl class="divide-y divide-slate-100 text-sm">
           <div class="px-5 py-3 grid sm:grid-cols-3 gap-1"><dt class="text-slate-500 flex items-center gap-2"><i data-lucide="utensils" class="w-4 h-4"></i> Alimento disponible</dt>
             <dd class="sm:col-span-2 font-medium">${esc(f.alimento)} (aprox. ${num(f.cantidad_aprox_kg)} kg)</dd></div>
           <div class="px-5 py-3 grid sm:grid-cols-3 gap-1"><dt class="text-slate-500 flex items-center gap-2"><i data-lucide="truck" class="w-4 h-4"></i> Ventana de recolección</dt>
             <dd class="sm:col-span-2 font-medium">Hoy entre ${hora12(textoAHora(v.inicio))} y ${hora12(textoAHora(v.fin))}
-              <span class="text-slate-500 font-normal">(${num(v.horas_antes_del_cierre)} h antes del cierre)</span></dd></div>
+              <span class="text-slate-500 font-normal">(límite ${num(v.horas_antes_del_cierre)} h antes del cierre)</span></dd></div>
           <div class="px-5 py-3 grid sm:grid-cols-3 gap-1"><dt class="text-slate-500 flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Nota de inocuidad</dt>
-            <dd class="sm:col-span-2 font-medium">${esc(f.nota_inocuidad)}</dd></div>
+            <dd class="sm:col-span-2 font-medium"><ul class="list-disc ml-4 space-y-0.5">${(f.recomendaciones_inocuidad || [f.nota_inocuidad])
+              .map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd></div>
           <div class="px-5 py-3 grid sm:grid-cols-3 gap-1"><dt class="text-slate-500 flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> Destinatario</dt>
             <dd class="sm:col-span-2 font-medium">${esc(f.destinatario_sugerido)}</dd></div>
           <div class="px-5 py-3 grid sm:grid-cols-3 gap-1"><dt class="text-slate-500 flex items-center gap-2"><i data-lucide="message-square" class="w-4 h-4"></i> Mensaje</dt>

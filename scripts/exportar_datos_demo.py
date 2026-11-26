@@ -50,11 +50,13 @@ def main() -> int:
     from fastapi.testclient import TestClient
 
     from backend import database as db
+    from backend import gemini_service
     from backend.services import alerta_excedente
     from data import generar_datos
     from ml import modelo_demanda
 
     os.environ["ZEROMERMA_AUTOPREPARAR"] = "0"
+    os.environ["GEMINI_API_KEY"] = ""   # el respaldo exportado nunca depende de Gemini
     cliente = TestClient(backend_main.app)
 
     catalogo = cliente.get("/api/catalogo").json()
@@ -95,6 +97,11 @@ def main() -> int:
         "apertura": alerta_excedente.APERTURA, "cierre": alerta_excedente.CIERRE,
         "exponente": alerta_excedente.EXPONENTE_CURVA, "colchon": alerta_excedente.COLCHON_PREPARACION,
         "ritmos": alerta_excedente.RITMOS, "sobrante_minimo": alerta_excedente.SOBRANTE_MINIMO,
+        "horas_anticipacion": alerta_excedente.HORAS_ANTICIPACION,
+        "horas_limite_antes_cierre": alerta_excedente.HORAS_LIMITE_ANTES_CIERRE,
+        "ventana_minima": alerta_excedente.VENTANA_MINIMA,
+        "recomendaciones": {"refrigerar": gemini_service.recomendaciones_base(True),
+                            "ambiente": gemini_service.recomendaciones_base(False)},
         "platillos": {k: {"nombre": p["nombre"], "peso_porcion_kg": p["peso_porcion_kg"],
                           "refrigerar": any(insumos_db[c]["categoria"] in alerta_excedente.CATEGORIAS_REFRIGERAR
                                             for c in p["receta"]),

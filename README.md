@@ -13,7 +13,7 @@ Plataforma web para reducir el desperdicio de alimentos en un restaurante de pla
 | 3. Modelo predictivo (Random Forest) | ✅ | [`docs/03_modelo_ml.md`](docs/03_modelo_ml.md) |
 | 4. Backend y API REST (FastAPI) | ✅ | [`docs/04_backend_api.md`](docs/04_backend_api.md) |
 | 5. Interfaz web (frontend) | ✅ | [`docs/05_frontend_ux.md`](docs/05_frontend_ux.md) |
-| 6. Integración Gemini | Pendiente | |
+| 6. Integración Google Gemini | ✅ (falta probar con llave real) | [`docs/06_integracion_gemini.md`](docs/06_integracion_gemini.md) |
 | 7. Integración final | Pendiente | |
 | 8. Plan de negocios | Pendiente | |
 
@@ -28,12 +28,14 @@ python backend/main.py        # genera datos y modelo si faltan → abre http://
 
 Documentación interactiva de la API: <http://localhost:8000/docs>.
 
+**Gemini (opcional):** copia `.env.example` como `.env` y pega tu `GEMINI_API_KEY` de Google AI Studio. Sin llave, la aplicación funciona igual en modo respaldo y lo indica en pantalla.
+
 Otros comandos útiles:
 
 ```bash
 python data/generar_datos.py              # regenera data/restaurante.db (datos SIMULADOS)
 python ml/modelo_demanda.py entrenar      # reentrena e imprime las métricas
-python -m unittest discover -s tests -v   # 34 pruebas
+python -m unittest discover -s tests -v   # 55 pruebas
 ```
 
 Sin servidor: doble clic en `frontend/index.html` abre la aplicación en **modo demo autónoma** (respuestas precalculadas del mismo modelo; se regeneran con `python scripts/exportar_datos_demo.py`).

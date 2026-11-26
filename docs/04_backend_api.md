@@ -1,7 +1,7 @@
 # 04 · Backend y API REST (FastAPI)
 
 > **Apartado 4 · Orden 2.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_api.py`, 15 pruebas). Total del repositorio: 34 pruebas.
+> Estado: ✅ implementado y probado (`tests/test_api.py`, 17 pruebas). Total del repositorio: 55 pruebas.
 
 > ⚠️ **Todas las respuestas provienen de datos SIMULADOS.** Cada respuesta incluye `es_simulado: true`, y los lotes del inventario lo indican uno por uno.
 
@@ -35,7 +35,8 @@ Se desactiva con `ZEROMERMA_AUTOPREPARAR=0`.
 | `ZEROMERMA_MODELO` | Ruta del modelo | `ml/modelo_rf.pkl` |
 | `ZEROMERMA_AUTOPREPARAR` | `0` desactiva la preparación automática | `1` |
 | `PORT` | Puerto con `python backend/main.py` | `8000` |
-| `GEMINI_API_KEY` | Llave de Gemini (Apartado 6) | sin definir → modo `fallback` |
+| `GEMINI_API_KEY` | Llave de Gemini (también se lee de `.env`) | sin definir → modo `fallback` |
+| `GEMINI_MODEL` · `GEMINI_TIMEOUT_MS` | Modelo y tiempo máximo de espera | `gemini-2.5-flash` · `15000` |
 
 ## 3. Arquitectura del backend
 
@@ -46,7 +47,7 @@ flowchart LR
     M --> R[services/rescate_menu.py]
     M --> A[services/alerta_excedente.py]
     M --> ML[ml/modelo_demanda.py<br/>modelo_rf.pkl]
-    R -. "Apartado 6" .-> G[services/gemini_service.py]
+    R -. "Apartado 6" .-> G[backend/gemini_service.py]
     A -. "Apartado 6" .-> G
     G -. "falla o no existe" .-> FB[reglas locales<br/>modo fallback]
     D --> DB[(data/restaurante.db)]
@@ -71,7 +72,7 @@ flowchart LR
 
 ### Gemini y su respaldo
 
-`/api/optimizar-menu` y `/api/alerta-excedente` intentan cargar `backend/services/gemini_service.py`, que se creará en el Apartado 6. Si no existe, no hay llave, se acaba la cuota o la respuesta no es válida, usan **reglas locales**. La respuesta lo indica con `modo` (`gemini` o `fallback`) y `motivo_fallback`.
+`/api/optimizar-menu` y `/api/alerta-excedente` llaman a `backend/gemini_service.py` (detalle en [`06_integracion_gemini.md`](06_integracion_gemini.md)). Si no hay llave, falla la red, se acaba la cuota o la respuesta no es válida, usan **reglas locales**. La respuesta lo indica con `modo` (`gemini` o `fallback`) y `motivo_fallback`.
 
 **El backend no confía en las cuentas de Gemini.** De su propuesta solo toma el platillo, el descuento, el tipo y el texto. Antes de aceptarla comprueba que:
 1. el platillo exista en el menú vigente;
@@ -191,7 +192,7 @@ El cuerpo puede ir vacío (`{}`).
 
 ```json
 { "modo": "fallback",
-  "motivo_fallback": "El servicio de Gemini aún no está integrado (Apartado 6).",
+  "motivo_fallback": "No hay GEMINI_API_KEY configurada.", "modelo": null,
   "insumos_criticos": [ { "clave": "pollo", "nombre": "Pechuga de pollo", "cantidad": 7.5, "unidad": "kg", "valor_mxn": 1012.5 } ],
   "estrategias": [ {
       "platillo_clave": "enchiladas_suizas", "platillo": "Enchiladas Suizas", "categoria": "plato fuerte",
@@ -230,7 +231,7 @@ Proyecta cuántas porciones sobrarán al cierre (20:00) y, si sobran **3 o más*
 | `platillo` | clave | `enchiladas_suizas` | |
 | `porciones_preparadas` | entero ≥ 0 | estimado | Si se omite: venta promedio del día × 1.10. |
 | `porciones_vendidas` | entero ≥ 0 | — | Si se da, el ritmo se **mide** en lugar de elegirse. |
-| `usar_gemini` | bool | `true` | Para redactar el mensaje (Apartado 6). |
+| `usar_gemini` | bool | `true` | Gemini redacta la ficha; `false` usa la plantilla. |
 | `generar_ficha` | bool | `true` | `false`: solo proyecta, sin ficha ni registro en bitácora (el frontend lo usa al mover el slider). |
 
 ```json
@@ -238,8 +239,8 @@ Proyecta cuántas porciones sobrarán al cierre (20:00) y, si sobran **3 o más*
 ```
 
 ```json
-{ "modo": "fallback", "motivo_fallback": "El servicio de Gemini aún no está integrado (Apartado 6).",
-  "alerta_id": 1,
+{ "modo": "fallback", "motivo_fallback": "No hay GEMINI_API_KEY configurada.",
+  "alerta_id": 1, "ventana_viable": true, "motivo_sin_ficha": null,
   "platillo": { "clave": "enchiladas_suizas", "nombre": "Enchiladas Suizas" },
   "hora_actual": "15:00", "ritmo": "lento", "factor_ritmo": 0.7, "confianza": "alta",
   "proyeccion": { "porciones_preparadas": 11, "vendidas_hasta_ahora": 4, "ventas_esperadas_al_cierre": 7,
@@ -247,7 +248,7 @@ Proyecta cuántas porciones sobrarán al cierre (20:00) y, si sobran **3 o más*
   "alerta_activa": true,
   "ficha": { "alimento": "4 porciones de Enchiladas Suizas", "platillo": "Enchiladas Suizas", "porciones": 4,
              "cantidad_aprox_kg": 2.1,
-             "ventana_recoleccion": { "inicio": "16:30", "fin": "18:30", "horas_antes_del_cierre": 3.5 },
+             "ventana_recoleccion": { "inicio": "16:00", "fin": "18:00", "horas_antes_del_cierre": 2.0 },
              "nota_inocuidad": "Mantener en refrigeración a 4 °C o menos hasta la entrega; transportar en contenedor cerrado y consumir el mismo día. No recalentar más de una vez.",
              "destinatario_sugerido": "Comedor comunitario / Red Campus",
              "mensaje": "Hola, somos Cafetería La Esquina. Hoy tendremos 4 porciones de Enchiladas Suizas (aprox. 2.1 kg) disponibles para donación. ..." },
@@ -263,7 +264,7 @@ Cálculos. Los supuestos son SIMULADOS y están como constantes en `alerta_exced
 | Proyección al cierre | venta esperada × factor de ritmo. |
 | Sobrante | preparadas − proyección al cierre. |
 | `confianza` | baja antes de ~35 % del día vendido, media hasta 60 %, alta después. |
-| Ventana de recolección | Empieza 1.5 h después del aviso (redondeado a 15 min) y termina 1.5 h antes del cierre. Si ya es tarde: inmediata hasta el cierre. |
+| Ventana de recolección | Empieza 1 h después del aviso (redondeado a 15 min; 15 min si ya es tarde) y termina **al menos 2 h antes del cierre** (18:00). `horas_antes_del_cierre` es la distancia del límite al cierre. Si ya no cabe una ventana de 30 min (después de ~17:15): `ventana_viable: false`, sin ficha y con `motivo_sin_ficha`. |
 | `hora_agotamiento_estimada` | Si la proyección supera lo preparado, cuándo se acabaría. |
 | Nota de inocuidad | Si la receta lleva proteína o lácteo: refrigerar a 4 °C o menos y consumir el mismo día. |
 
@@ -337,13 +338,13 @@ Cómo se calcula:
 
 1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 8 endpoints.
 2. En `/docs`, probar `POST /api/predecir` con margen `0.02`: `riesgo_desabasto: true`.
-3. `python -m unittest discover -s tests -v`: 34 pruebas. Las 15 de la API comprueban:
+3. `python -m unittest discover -s tests -v`: 55 pruebas. Las 17 de la API comprueban:
    - el arranque genera datos y modelo;
    - el inventario está ordenado y con el semáforo correcto, y el filtro por estado funciona;
    - la predicción cumple la fórmula, alerta el desabasto y responde 422/400 a entradas inválidas;
    - las promociones solo usan platillos del menú con insumos críticos y precio ≥ 1.5 × costo;
-   - con un Gemini falso, la respuesta válida se acepta **con cifras recalculadas**, se rechaza un platillo inventado y se rechaza un descuento no rentable;
-   - la alerta con ventas lentas genera ficha (ventana 16:30–18:30) y se puede "enviar"; con `generar_ficha: false` solo proyecta sin registrar; sin sobrante no hay ficha; y responde 422/400/404 a errores;
+   - sin llave se usa el respaldo; con un Gemini simulado, la respuesta válida se acepta **con cifras recalculadas**, se rechaza un platillo inventado y se rechaza un descuento no rentable;
+   - la alerta con ventas lentas genera ficha (ventana 16:00–18:00, con recomendaciones de inocuidad) y se puede "enviar"; a las 17:45 ya no hay ventana viable; con `generar_ficha: false` solo proyecta sin registrar; sin sobrante no hay ficha; y responde 422/400/404 a errores;
    - la auditoría tiene 7 días, no hay fuga de datos y los totales cuadran.
 
 Ejemplo con `curl`:

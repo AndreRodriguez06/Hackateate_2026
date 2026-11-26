@@ -50,6 +50,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel, Field, field_validator  # noqa: E402
 
 from backend import database as db  # noqa: E402
+from backend import gemini_service  # noqa: E402
 from backend.services import alerta_excedente, rescate_menu  # noqa: E402
 from data import generar_datos  # noqa: E402
 from ml import modelo_demanda  # noqa: E402
@@ -182,6 +183,7 @@ class OptimizarMenuEntrada(BaseModel):
 class OptimizarMenuRespuesta(BaseModel):
     modo: Literal["gemini", "fallback"]
     motivo_fallback: str | None
+    modelo: str | None = None
     insumos_criticos: list[dict]
     estrategias: list[dict]
     totales: dict[str, float]
@@ -218,7 +220,9 @@ class AlertaRespuesta(BaseModel):
     confianza: str
     proyeccion: dict
     alerta_activa: bool
+    ventana_viable: bool
     ficha: dict | None
+    motivo_sin_ficha: str | None = None
     es_simulado: bool
 
 
@@ -269,7 +273,8 @@ def salud():
         "estado": "ok" if base and db.RUTA_MODELO.exists() else "incompleto",
         "base_datos": base,
         "modelo_cargado": db.RUTA_MODELO.exists(),
-        "gemini_configurado": bool(os.getenv("GEMINI_API_KEY")),
+        "gemini_configurado": gemini_service.configurado(),
+        "gemini_modelo": gemini_service.modelo(),
         "frontend": db.RUTA_FRONTEND.exists(),
         "origen_dato": origen,
         "es_simulado": bool(origen) and es_simulado(origen),
@@ -373,7 +378,7 @@ def predecir(entrada: PrediccionEntrada):
 def optimizar_menu(entrada: OptimizarMenuEntrada = OptimizarMenuEntrada()):
     """
     Cruza insumos vigentes que caducan dentro de `horas_umbral` con el recetario y propone
-    promociones rentables SOLO sobre platillos del menú. Usa Gemini (Apartado 6) si está
+    promociones rentables SOLO sobre platillos del menú. Usa Gemini (backend/gemini_service.py) si está
     disponible; si no, reglas deterministas (`modo: fallback`). Las cifras siempre se
     recalculan en el backend.
     """

@@ -68,7 +68,7 @@ flowchart LR
     subgraph Servidor["Servidor local · uvicorn :8000"]
         API[FastAPI<br/>backend/main.py]
         ML[Modelo de demanda<br/>Random Forest<br/>ml/modelo_demanda.py]
-        GEM[Servicio Gemini<br/>backend/services/gemini_service.py]
+        GEM[Servicio Gemini<br/>backend/gemini_service.py]
         FB[Fallback local<br/>reglas deterministas]
         DB[(SQLite<br/>data/restaurante.db)]
     end
@@ -107,7 +107,7 @@ Las rutas marcadas con ✅ ya existen. Las demás se crean en el apartado indica
 Hackateate_2026/
 ├── README.md                      ✅ (versión final en Apartado 7)
 ├── requirements.txt               ✅ (se amplía en Apartado 4)
-├── .env.example                   Apartado 6  (GEMINI_API_KEY=...)
+├── .env.example                   ✅ Apartado 6  (GEMINI_API_KEY=...)
 ├── .gitignore                     ✅
 ├── data/
 │   ├── schema.sql                 ✅ Apartado 2 · esquema SQLite
@@ -120,10 +120,10 @@ Hackateate_2026/
 ├── backend/
 │   ├── main.py                    ✅ Apartado 4 · app FastAPI, modelos Pydantic, endpoints, estáticos
 │   ├── database.py                ✅ Apartado 4 · conexión y consultas
+│   ├── gemini_service.py          ✅ Apartado 6 · Gemini con response_schema + modo respaldo
 │   └── services/
 │       ├── rescate_menu.py        ✅ Apartado 4 · promociones (reglas + validación de Gemini)
-│       ├── alerta_excedente.py    ✅ Apartado 4 · proyección y ficha de rescate
-│       └── gemini_service.py      Apartado 6 · llamadas con response_schema
+│       └── alerta_excedente.py    ✅ Apartado 4 · proyección y ficha de rescate
 ├── frontend/
 │   ├── index.html                 ✅ Apartado 5 · 4 vistas
 │   ├── app.js                     ✅ Apartado 5 · consume /api/* con respaldo local
@@ -134,14 +134,15 @@ Hackateate_2026/
 ├── tests/
 │   ├── test_generar_datos.py      ✅ Apartado 2
 │   ├── test_modelo_demanda.py     ✅ Apartado 3
-│   └── test_api.py                ✅ Apartado 4
+│   ├── test_api.py                ✅ Apartado 4
+│   └── test_gemini_service.py     ✅ Apartado 6
 └── docs/
     ├── 01_arquitectura.md         ✅ este documento
     ├── 02_base_de_datos.md        ✅
     ├── 03_modelo_ml.md            ✅ Apartado 3
     ├── 04_backend_api.md          ✅ Apartado 4
     ├── 05_frontend_ux.md          ✅ Apartado 5
-    ├── 06_integracion_gemini.md   Apartado 6
+    ├── 06_integracion_gemini.md   ✅ Apartado 6
     ├── 07_integracion_e2e.md      Apartado 7
     └── 08_plan_de_negocios.md     Apartado 8
 ```

@@ -166,7 +166,7 @@ Reglas de la capa de conexión (`api()` y `conRespaldo()` en `app.js`):
 |---|---|
 | Clientes, consumo, inventario, ventas, precios, recetas | **SIMULADO** |
 | Predicciones e importancia de variables | Modelo real entrenado con datos **SIMULADOS** |
-| Promociones y fichas | Reglas reales (o Gemini en el Apartado 6) sobre datos **SIMULADOS** |
+| Promociones y fichas | Gemini validado o reglas locales sobre datos **SIMULADOS** |
 | Envío del aviso al comedor | **SIMULADO** |
 | Restaurante y menú QR | Ficticios |
 
@@ -199,8 +199,8 @@ Preparación (antes de entrar):
 | | | Señalar el distintivo de modo y una tarjeta: pérdida contra margen. | "Si se tira, se pierden $458 en enchiladas; con la promoción recuperamos $631. Gemini redacta el texto, pero las cuentas las hace y valida nuestro backend." |
 | | | Señalar el menú QR. | "Así lo ve el comensal." |
 | 4:15–5:45 | 3 · Alerta | Ritmo **Ventas Lentas**, hora 3:00 PM: alerta naranja. | "A media jornada proyectamos el cierre. Hoy sobrarán 4 porciones." |
-| | | **Generar Ficha** → **Enviar aviso**. | "La ficha lleva la ventana de recolección 3.5 h antes del cierre y la nota de inocuidad. El envío en el prototipo es simulado; el siguiente paso es WhatsApp." |
-| | | Mover la hora a 7:00 PM. | "Mientras más tarde, más corta la ventana: por eso la alerta es temprana." |
+| | | **Generar Ficha** → **Enviar aviso**. | "La ficha da una ventana de 4:00 a 6:00 PM, que termina 2 h antes del cierre para que el comedor alcance a repartir, y las recomendaciones de inocuidad. El envío en el prototipo es simulado; el siguiente paso es WhatsApp." |
+| | | Mover la hora a 5:30 PM. | "Ya no da tiempo para una recolección segura y el sistema lo dice. Por eso la alerta es temprana." |
 | 5:45–7:15 | 4 · Auditoría | Señalar los KPIs. Abrir el acordeón. | "Máquina del tiempo: reentrenamos el modelo sin la última semana y comparamos. −77 % de merma y 95 kg evitados, con menos demanda sin cubrir que la compra tradicional. Precios simulados; las fuentes y la metodología están aquí." |
 | 7:15–8:00 | Respaldo | Cambiar a la pestaña de `index.html` abierta con doble clic. | "Si el servidor falla, la página no se rompe: entra en modo demo con respuestas precalculadas del mismo modelo, y lo dice arriba." |
 
