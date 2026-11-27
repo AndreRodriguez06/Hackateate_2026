@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ZeroMerma AI — Exporta los datos del "modo demo autónoma" del frontend
+Opsia — Exporta los datos del "modo demo autónoma" del frontend
 Archivo: /scripts/exportar_datos_demo.py
 
 Genera `frontend/datos_demo.js` con respuestas REALES del backend y del modelo
@@ -11,7 +11,7 @@ abra `index.html` sin servidor:
     (7 días × quincena × lluvia × evento cercano × evento en la plaza × festivo × 4 épocas)
     y los 46 insumos
   * historial diario de compras (tradicional, consumo real y sugerencia fuera de muestra)
-  * inventario, promociones (modo reglas) y auditoría de los 46 insumos
+  * inventario y promociones (modo reglas)
   * ventas promedio por platillo y día, para recalcular la alerta de excedentes en JS
 
 Trabaja sobre COPIAS temporales de la base y el modelo: no escribe en data/restaurante.db.
@@ -57,7 +57,7 @@ def main() -> int:
     from data import generar_datos
     from ml import modelo_demanda
 
-    os.environ["ZEROMERMA_AUTOPREPARAR"] = "0"
+    os.environ["OPSIA_AUTOPREPARAR"] = "0"
     os.environ["GEMINI_API_KEY"] = ""   # el respaldo exportado nunca depende de Gemini
     cliente = TestClient(backend_main.app)
 
@@ -88,14 +88,7 @@ def main() -> int:
             "margen_recomendado": round(paquete["margen_recomendado_p90"][clave], 3),
         })
 
-    # 3) Auditoría de cada insumo (el backtest se calcula una vez y se reutiliza).
-    auditoria = {}
-    for i in insumos:
-        r = cliente.get("/api/auditoria", params={"insumo": i["clave"]}).json()
-        auditoria[i["clave"]] = {"insumo": r["insumo"], "serie": r["serie"]}
-    auditoria_totales = {k: r[k] for k in ("periodo", "totales", "metodologia")}
-
-    # 4) Historial diario de compras para la Vista 5 (se agrupa en el navegador).
+    # 3) Historial diario de compras para la Vista 5 (se agrupa en el navegador).
     hist = paquete["historico"]
     fechas = list(hist["fechas"])
     idx_f = {f: k for k, f in enumerate(fechas)}
@@ -117,7 +110,7 @@ def main() -> int:
         "metodologia": cliente.get("/api/historial-compras").json()["metodologia"],
     }
 
-    # 5) Datos para recalcular la alerta de excedentes en el navegador.
+    # 4) Datos para recalcular la alerta de excedentes en el navegador.
     alerta = {
         "apertura": alerta_excedente.APERTURA, "cierre": alerta_excedente.CIERRE,
         "exponente": alerta_excedente.EXPONENTE_CURVA, "colchon": alerta_excedente.COLCHON_PREPARACION,
@@ -146,7 +139,6 @@ def main() -> int:
         "catalogo": catalogo,
         "inventario": inventario,
         "optimizar": optimizar,
-        "auditoria": {"por_insumo": auditoria, **auditoria_totales},
         "historial": historial,
         "alerta": alerta,
     }

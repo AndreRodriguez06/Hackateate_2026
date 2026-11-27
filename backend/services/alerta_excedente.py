@@ -1,5 +1,5 @@
 """
-ZeroMerma AI — Alerta temprana de excedentes
+Opsia — Alerta temprana de excedentes
 Archivo: /backend/services/alerta_excedente.py
 
 A media jornada proyecta cuántas porciones de un platillo sobrarán al cierre y,

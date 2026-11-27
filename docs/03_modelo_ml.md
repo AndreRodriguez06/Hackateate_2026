@@ -17,7 +17,7 @@ Decirle al encargado **cuánto comprar hoy de cada insumo**, con un margen de se
 | scikit-learn 1.5.2 · `RandomForestRegressor` | Modelo de predicción. |
 | scikit-learn · `TimeSeriesSplit`, `mean_absolute_error`, `r2_score` | Validación temporal y métricas. |
 | joblib | Guarda el modelo en `ml/modelo_rf.pkl`. |
-| `ml/modelo_demanda.py` | Entrenamiento, validación, predicción, historial fuera de muestra, backtesting y línea de comandos. |
+| `ml/modelo_demanda.py` | Entrenamiento, validación, predicción, historial fuera de muestra y línea de comandos. |
 | `tests/test_modelo_demanda.py` | 12 pruebas automáticas. |
 
 ## 3. Cómo ejecutarlo
@@ -178,15 +178,15 @@ Las tres estrategias se evalúan contra el consumo real del último mes, valuado
 | Estrategia | Compra | Sobrante | Demanda no cubierta | Días-insumo con algún faltante |
 |---|---|---|---|---|
 | Compra tradicional "a ojo" | $322,472 | $133,832 | 1.51 % | 4.7 % |
-| ZeroMerma, margen fijo 8 % | $195,397 | $10,579 | 3.51 % | 42.2 % |
-| **ZeroMerma, margen recomendado** | **$214,025** | **$24,318** | **0.96 %** | **12.4 %** |
+| Opsia, margen fijo 8 % | $195,397 | $10,579 | 3.51 % | 42.2 % |
+| **Opsia, margen recomendado** | **$214,025** | **$24,318** | **0.96 %** | **12.4 %** |
 
 Lectura:
 - Con el margen recomendado se compra **34 % menos** y el sobrante baja **82 %**, y la demanda no cubierta es **menor** que con la compra tradicional (0.96 % contra 1.51 %).
 - Hay más días con algún faltante (12.4 % contra 4.7 %), pero son faltantes pequeños: en conjunto valen 0.96 % de lo consumido.
 - Con margen fijo de 8 %, 42 % de los días-insumo tienen faltante. Por eso la interfaz alerta con margen bajo y sugiere el margen recomendado.
 
-## 8. Historial fuera de muestra (Vista 5)
+## 8. Historial fuera de muestra (Vista 4 · Historial de compras)
 
 Para mostrar cuánto se habría ahorrado en **todo** el historial, `predicciones_historicas()` calcula la compra que habría sugerido el modelo **para cada día, sin haber visto ese día**:
 
@@ -194,7 +194,7 @@ Para mostrar cuánto se habría ahorrado en **todo** el historial, `predicciones
 - Después, cada bloque de 30 días se predice con un modelo entrenado **solo con los días anteriores** (ventana creciente).
 - Compra sugerida = predicción × (1 + margen recomendado del insumo).
 
-El resultado se guarda dentro de `modelo_rf.pkl` (`paquete["historico"]`) y lo usa `GET /api/historial-compras`. Resultado sobre los 305 días comparables (todos los insumos, precios SIMULADOS): compra $3.07 M (tradicional) contra $2.16 M (ZeroMerma), es decir **$915 mil menos (−29.8 %)**; merma −72.4 %; demanda no cubierta 0.98 % contra 1.00 %.
+El resultado se guarda dentro de `modelo_rf.pkl` (`paquete["historico"]`) y lo usa `GET /api/historial-compras`. Resultado sobre los 305 días comparables (todos los insumos, precios SIMULADOS): compra $3.07 M (tradicional) contra $2.16 M (Opsia), es decir **$915 mil menos (−29.8 %)**; merma −72.4 %; demanda no cubierta 0.98 % contra 1.00 %.
 
 > Simplificación: el margen recomendado se calcula con el periodo de entrenamiento y se aplica a todo el historial.
 

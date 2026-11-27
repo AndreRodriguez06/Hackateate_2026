@@ -1,5 +1,5 @@
 /* =============================================================================
-   ZeroMerma AI — Frontend (Vanilla JS)
+   Opsia — Frontend (Vanilla JS)
    Archivo: /frontend/app.js
 
    Resiliencia dual:
@@ -236,19 +236,13 @@
     historial(agrupar, insumo) {
       return agruparHistorial(DEMO.historial, agrupar, insumo);
     },
-
-    auditoria(insumo) {
-      const a = DEMO.auditoria;
-      const s = a.por_insumo[insumo] || a.por_insumo.pollo;
-      return { insumo: s.insumo, serie: s.serie, periodo: a.periodo, totales: a.totales, metodologia: a.metodologia, es_simulado: true };
-    },
   };
 
   // ---------------------------------------------------------------------------
   // Navegación por pestañas
   // ---------------------------------------------------------------------------
-  const graficas = { importancia: null, auditoria: null, historial: null };
-  const cargado = { rescate: false, alerta: false, auditoria: false, historial: false };
+  const graficas = { importancia: null, historial: null };
+  const cargado = { rescate: false, alerta: false, historial: false };
 
   function mostrarVista(nombre) {
     $$('[role="tab"]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === nombre)));
@@ -259,7 +253,6 @@
       if (nombre === 'planeador' && graficas.importancia) graficas.importancia.resize();
       if (nombre === 'rescate' && !cargado.rescate) { cargado.rescate = true; cargarInventario(); }
       if (nombre === 'alerta' && !cargado.alerta) { cargado.alerta = true; actualizarAlerta(); }
-      if (nombre === 'auditoria') { if (!cargado.auditoria) { cargado.auditoria = true; cargarAuditoria(); } else if (graficas.auditoria) graficas.auditoria.resize(); }
       if (nombre === 'historial') { if (!cargado.historial) { cargado.historial = true; cargarHistorial(); } else if (graficas.historial) graficas.historial.resize(); }
     });
   }
@@ -278,9 +271,7 @@
         .map((i) => `<option value="${esc(i.clave)}">${esc(i.nombre)} (${esc(i.unidad)})</option>`).join('') +
       '</optgroup>').join('');
     $('#insumo').innerHTML = opcionesInsumo;
-    $('#insumoAuditoria').innerHTML = opcionesInsumo;
     $('#insumo').value = 'pollo';
-    $('#insumoAuditoria').value = 'pollo';
     $('#insumoHistorial').innerHTML = '<option value="todos">Todos los productos (en $MXN)</option>' + opcionesInsumo;
 
     const platos = datos.platillos.filter((p) => !['bebida'].includes(p.categoria))
@@ -315,6 +306,16 @@
     $('#escenario').value = coincide ? coincide[0] : 'personalizado';
   }
 
+  /** Contexto del día elegido en el panel (día, casillas y época) + insumo y margen. */
+  function entradaPrediccion(insumo, margen) {
+    return {
+      insumo, dia_semana: Number($('#dia').value),
+      es_quincena: $('#quincena').checked, lluvia: $('#lluvia').checked, evento: $('#evento').checked,
+      evento_plaza: $('#eventoPlaza').checked, es_dia_festivo: $('#festivo').checked, epoca: $('#epoca').value,
+      margen_seguridad: margen,
+    };
+  }
+
   let ultimoPlan = 0;
   async function actualizarPlan() {
     const margen = Number($('#margen').value) / 100;
@@ -323,12 +324,7 @@
       (margen < 0.04 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700');
     $('#bannerDesabasto').classList.toggle('hidden', margen >= 0.04);
 
-    const entrada = {
-      insumo: $('#insumo').value, dia_semana: Number($('#dia').value),
-      es_quincena: $('#quincena').checked, lluvia: $('#lluvia').checked, evento: $('#evento').checked,
-      evento_plaza: $('#eventoPlaza').checked, es_dia_festivo: $('#festivo').checked, epoca: $('#epoca').value,
-      margen_seguridad: margen,
-    };
+    const entrada = entradaPrediccion($('#insumo').value, margen);
     if (!entrada.insumo) return;
     const turno = ++ultimoPlan;  // descarta respuestas que lleguen fuera de orden
     try {
@@ -395,11 +391,152 @@
     });
   }
 
-  $('#escenario').addEventListener('change', () => { aplicarEscenario(); actualizarPlan(); });
+  // ---------------------------------------------------------------------------
+  // Lista de compras: varios insumos, cada uno con su margen, para el mismo día
+  // ---------------------------------------------------------------------------
+  const CLAVE_LISTA = 'opsia.listaCompras';
+  let lista = [];                 // [{ clave, nombre, unidad, margen }]
+  const resultadosLista = {};     // clave -> respuesta de /api/predecir
+  try { lista = JSON.parse(localStorage.getItem(CLAVE_LISTA) || '[]'); } catch (_) { lista = []; }
+  const guardarLista = () => { try { localStorage.setItem(CLAVE_LISTA, JSON.stringify(lista)); } catch (_) { /* sin almacenamiento */ } };
+
+  function textoContexto() {
+    const partes = [DIAS[Number($('#dia').value)]];
+    if ($('#quincena').checked) partes.push('quincena');
+    if ($('#lluvia').checked) partes.push('lluvia');
+    if ($('#evento').checked) partes.push('evento cercano');
+    if ($('#eventoPlaza').checked) partes.push('evento en la plaza');
+    if ($('#festivo').checked) partes.push('festivo');
+    partes.push($('#epoca').selectedOptions[0].textContent.split(' (')[0].toLowerCase());
+    return partes.join(' · ');
+  }
+
+  async function calcularRenglon(item) {
+    const entrada = entradaPrediccion(item.clave, item.margen);
+    const { datos } = await conRespaldo(() => post('/api/predecir', entrada), () => local.predecir(entrada));
+    resultadosLista[item.clave] = datos;
+  }
+
+  let turnoLista = 0;
+  async function recalcularLista() {
+    const turno = ++turnoLista;
+    try {
+      await Promise.all(lista.map(calcularRenglon));
+    } catch (err) {
+      mostrarError('#errorPlaneador', `No se pudo recalcular la lista: ${err.message}`);
+    }
+    if (turno === turnoLista) pintarLista();
+  }
+  const recalcularListaPronto = debounce(recalcularLista, 200);
+
+  function pintarLista() {
+    $('#listaContexto').textContent = lista.length
+      ? `${lista.length} insumo${lista.length === 1 ? '' : 's'} para: ${textoContexto()}. Si cambias el día o el contexto, las cantidades se recalculan.`
+      : 'Elige un insumo, ajusta su margen y pulsa "Agregar a la lista de compras".';
+    ['#copiarLista', '#descargarLista', '#vaciarLista'].forEach((id) => { $(id).disabled = !lista.length; });
+    if (!lista.length) {
+      $('#tablaLista').innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">La lista está vacía.</td></tr>';
+      $('#pieLista').innerHTML = '';
+      return;
+    }
+    let total = 0;
+    $('#tablaLista').innerHTML = lista.map((item) => {
+      const r = resultadosLista[item.clave];
+      if (r) total += r.costo_estimado_mxn;
+      const riesgo = item.margen < 0.04;
+      return `<tr class="hover:bg-slate-50">
+        <td class="px-4 py-2.5"><span class="font-medium">${esc(item.nombre)}</span>
+          ${riesgo ? '<span class="ml-1 text-[11px] font-medium text-rose-700 bg-rose-50 rounded px-1.5 py-0.5">riesgo de desabasto</span>' : ''}</td>
+        <td class="px-4 py-2.5 text-right tabular font-semibold">${r ? `${num(r.compra_sugerida)} ${esc(item.unidad)}` : '…'}</td>
+        <td class="px-4 py-2.5 text-right whitespace-nowrap">
+          <label class="sr-only" for="margen-${esc(item.clave)}">Margen de ${esc(item.nombre)}</label>
+          <input id="margen-${esc(item.clave)}" data-margen="${esc(item.clave)}" type="number" min="0" max="25" step="1"
+            value="${Math.round(item.margen * 100)}" class="w-16 text-right tabular border border-slate-300 rounded-md px-1.5 py-1" /> %</td>
+        <td class="px-4 py-2.5 text-right tabular">${r ? mxn(r.costo_estimado_mxn) : '…'}</td>
+        <td class="px-2 py-2.5 text-right"><button type="button" data-quitar="${esc(item.clave)}" class="p-1 rounded hover:bg-rose-50 text-slate-400 hover:text-rose-700" aria-label="Quitar ${esc(item.nombre)}"><i data-lucide="x" class="w-4 h-4"></i></button></td>
+      </tr>`;
+    }).join('');
+    $('#pieLista').innerHTML = `<tr><td class="px-4 py-2.5">Total</td><td></td><td></td>
+      <td class="px-4 py-2.5 text-right tabular">${mxn(total)}</td><td></td></tr>`;
+    $$('#tablaLista [data-quitar]').forEach((b) => b.addEventListener('click', () => {
+      lista = lista.filter((i) => i.clave !== b.dataset.quitar);
+      guardarLista(); pintarLista(); actualizarBotonAgregar();
+    }));
+    $$('#tablaLista [data-margen]').forEach((inp) => inp.addEventListener('change', async () => {
+      const item = lista.find((i) => i.clave === inp.dataset.margen);
+      item.margen = Math.min(25, Math.max(0, Math.round(Number(inp.value) || 0))) / 100;
+      guardarLista();
+      await calcularRenglon(item);
+      pintarLista();
+    }));
+    iconos();
+  }
+
+  function actualizarBotonAgregar() {
+    const enLista = lista.some((i) => i.clave === $('#insumo').value);
+    $('#agregarListaTexto').textContent = enLista ? 'Actualizar margen en la lista' : 'Agregar a la lista de compras';
+  }
+
+  $('#agregarLista').addEventListener('click', async () => {
+    const opcion = $('#insumo').selectedOptions[0];
+    if (!opcion) return;
+    const clave = opcion.value;
+    const nombre = opcion.textContent.replace(/\s*\([^)]*\)\s*$/, '');
+    const unidad = (opcion.textContent.match(/\(([^)]*)\)\s*$/) || [null, ''])[1];
+    const margen = Number($('#margen').value) / 100;
+    const existente = lista.find((i) => i.clave === clave);
+    if (existente) existente.margen = margen; else lista.push({ clave, nombre, unidad, margen });
+    guardarLista();
+    $('#agregarLista').disabled = true;
+    try {
+      await calcularRenglon(lista.find((i) => i.clave === clave));
+      pintarLista();
+      toast(existente ? `${nombre}: margen actualizado a ${Math.round(margen * 100)} %.` : `${nombre} agregado a la lista.`);
+    } catch (err) {
+      mostrarError('#errorPlaneador', `No se pudo agregar: ${err.message}`);
+    } finally {
+      $('#agregarLista').disabled = false;
+      actualizarBotonAgregar();
+    }
+  });
+
+  function textoLista(separador) {
+    const filas = lista.map((i) => {
+      const r = resultadosLista[i.clave];
+      return [i.nombre, r ? r.compra_sugerida.toFixed(2) : '', i.unidad, Math.round(i.margen * 100), r ? r.costo_estimado_mxn.toFixed(2) : ''];
+    });
+    return [['Insumo', 'Cantidad', 'Unidad', 'Margen %', 'Costo MXN'], ...filas].map((f) => f.join(separador)).join('\n');
+  }
+
+  $('#copiarLista').addEventListener('click', async () => {
+    const texto = `Lista de compras · ${textoContexto()}\n` + textoLista('\t');
+    try { await navigator.clipboard.writeText(texto); toast('Lista copiada: pégala en WhatsApp, correo o Excel.'); }
+    catch (_) { toast('No se pudo copiar automáticamente; usa el botón CSV.', 'aviso'); }
+  });
+  $('#descargarLista').addEventListener('click', () => {
+    const blob = new Blob(['﻿' + textoLista(',')], { type: 'text/csv;charset=utf-8' });
+    const enlace = document.createElement('a');
+    enlace.href = URL.createObjectURL(blob);
+    enlace.download = `lista_compras_${DIAS[Number($('#dia').value)].toLowerCase()}.csv`;
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    setTimeout(() => URL.revokeObjectURL(enlace.href), 1000);
+  });
+  $('#vaciarLista').addEventListener('click', () => {
+    lista = []; guardarLista(); pintarLista(); actualizarBotonAgregar();
+  });
+
+  $('#escenario').addEventListener('change', () => { aplicarEscenario(); actualizarPlan(); recalcularListaPronto(); });
   $('#margen').addEventListener('input', actualizarPlanPronto);
-  $('#insumo').addEventListener('change', actualizarPlan);
+  $('#insumo').addEventListener('change', () => {
+    const item = lista.find((i) => i.clave === $('#insumo').value);
+    if (item) $('#margen').value = String(Math.round(item.margen * 100));   // retoma el margen que ya tenía en la lista
+    actualizarBotonAgregar();
+    actualizarPlan();
+  });
   ['#dia', '#epoca', '#quincena', '#lluvia', '#evento', '#eventoPlaza', '#festivo'].forEach((id) =>
-    $(id).addEventListener('change', () => { marcarPersonalizado(); actualizarPlan(); }));
+    $(id).addEventListener('change', () => { marcarPersonalizado(); actualizarPlan(); recalcularListaPronto(); }));
 
   // ---------------------------------------------------------------------------
   // VISTA 2 · Rescate rentable en menú
@@ -678,67 +815,7 @@
   $('#preparadas').addEventListener('input', actualizarAlertaPronto);
 
   // ---------------------------------------------------------------------------
-  // VISTA 4 · Auditoría y backtesting
-  // ---------------------------------------------------------------------------
-  async function cargarAuditoria() {
-    const insumo = $('#insumoAuditoria').value || 'pollo';
-    try {
-      const { datos: r } = await conRespaldo(() => api(`/api/auditoria?dias=7&insumo=${encodeURIComponent(insumo)}`),
-                                              () => local.auditoria(insumo));
-      mostrarError('#errorAuditoria', '');
-      pintarAuditoria(r);
-    } catch (err) {
-      mostrarError('#errorAuditoria', `No se pudo cargar la auditoría: ${err.message}`);
-    }
-  }
-
-  function pintarAuditoria(r) {
-    const t = r.totales;
-    $('#audReduccion').textContent = `${t.reduccion_merma_pct > 0 ? '+' : ''}${num(t.reduccion_merma_pct)}%`;
-    $('#audKg').textContent = `${num(t.merma_evitada_kg)} kg`;
-    $('#audMxn').textContent = mxn(t.merma_evitada_mxn);
-    $('#audCobertura').textContent = `${num(t.zeromerma.demanda_no_cubierta_pct, 2)}%`;
-    $('#audCoberturaSub').textContent = `Compra tradicional: ${num(t.tradicional.demanda_no_cubierta_pct, 2)}% · menos es mejor`;
-    $('#periodoAuditoria').textContent =
-      `Backtesting del ${r.periodo.desde} al ${r.periodo.hasta}: el modelo se entrenó solo hasta el ${r.periodo.modelo_entrenado_hasta}.`;
-    $('#metodologiaAuditoria').textContent = r.metodologia;
-    $('#tituloGraficaAuditoria').textContent = `Comparativa diaria: ${r.insumo.nombre} (${r.insumo.unidad}) · margen ${num(r.insumo.margen_aplicado * 100)}%`;
-    pintarGraficaAuditoria(r);
-  }
-
-  function pintarGraficaAuditoria(r) {
-    if (!hayChart()) return;
-    const etiquetas = r.serie.map((p) => {
-      const d = new Date(p.fecha + 'T12:00:00');
-      return `${DIAS[(d.getDay() + 6) % 7].slice(0, 3)} ${d.getDate()}`;
-    });
-    const u = r.insumo.unidad;
-    const series = [
-      { type: 'bar', label: 'Compra Tradicional', data: r.serie.map((p) => p.compra_tradicional), backgroundColor: COLORES.slate300, borderRadius: 4, order: 3 },
-      { type: 'bar', label: 'Compra Sugerida por ZeroMerma AI', data: r.serie.map((p) => p.compra_sugerida), backgroundColor: COLORES.emerald600, borderRadius: 4, order: 2 },
-      { type: 'line', label: 'Demanda Real', data: r.serie.map((p) => p.demanda_real), borderColor: COLORES.slate900, backgroundColor: COLORES.slate900,
-        borderWidth: 2, pointRadius: 4, tension: 0.3, order: 1 },
-    ];
-    if (graficas.auditoria) graficas.auditoria.destroy();
-    graficas.auditoria = new Chart($('#graficaAuditoria'), {
-      data: { labels: etiquetas, datasets: series },
-      options: {
-        responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, color: COLORES.slate900 } },
-          tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${num(c.parsed.y, 2)} ${u}` } },
-        },
-        scales: {
-          y: { beginAtZero: true, ticks: { callback: (v) => `${v} ${u}`, color: COLORES.slate500 }, grid: { color: COLORES.slate200 } },
-          x: { ticks: { color: COLORES.slate500 }, grid: { display: false } },
-        },
-      },
-    });
-  }
-  $('#insumoAuditoria').addEventListener('change', cargarAuditoria);
-
-  // ---------------------------------------------------------------------------
-  // VISTA 5 · Historial de compras
+  // VISTA 4 · Historial de compras
   // ---------------------------------------------------------------------------
   const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   let agruparActual = 'semana';
@@ -775,9 +852,9 @@
         compra_tradicional_mxn: s((k) => sum(H.trad, k, true)), merma_tradicional_mxn: s((k) => merma(H.trad, k)) };
       fila.compra_sugerida = completo ? s((k) => sum(H.sugerida, k, enPesos)) : null;
       fila.compra_sugerida_mxn = completo ? s((k) => sum(H.sugerida, k, true)) : null;
-      fila.merma_zeromerma_mxn = completo ? s((k) => merma(H.sugerida, k)) : null;
+      fila.merma_opsia_mxn = completo ? s((k) => merma(H.sugerida, k)) : null;
       fila.ahorro_compra_mxn = completo ? fila.compra_tradicional_mxn - fila.compra_sugerida_mxn : null;
-      fila.merma_evitada_mxn = completo ? fila.merma_tradicional_mxn - fila.merma_zeromerma_mxn : null;
+      fila.merma_evitada_mxn = completo ? fila.merma_tradicional_mxn - fila.merma_opsia_mxn : null;
       delete fila.idx;
       return fila;
     });
@@ -789,14 +866,14 @@
     const t = {
       dias_comparables: K.length,
       compra_tradicional_mxn: tot((k) => sum(H.trad, k, true)), compra_sugerida_mxn: tot((k) => sum(H.sugerida, k, true)),
-      merma_tradicional_mxn: tot((k) => merma(H.trad, k)), merma_zeromerma_mxn: tot((k) => merma(H.sugerida, k)),
+      merma_tradicional_mxn: tot((k) => merma(H.trad, k)), merma_opsia_mxn: tot((k) => merma(H.sugerida, k)),
       merma_evitada_kg: tot((k) => kg.reduce((a, j) => a + (Math.max(H.trad[k][j] - H.real[k][j], 0) - Math.max(H.sugerida[k][j] - H.real[k][j], 0)) * H.insumos[j].factor, 0)),
       demanda_no_cubierta_tradicional_pct: real ? faltante(H.trad) / real * 100 : 0,
-      demanda_no_cubierta_zeromerma_pct: real ? faltante(H.sugerida) / real * 100 : 0,
+      demanda_no_cubierta_opsia_pct: real ? faltante(H.sugerida) / real * 100 : 0,
     };
     t.ahorro_compra_mxn = t.compra_tradicional_mxn - t.compra_sugerida_mxn;
-    t.merma_evitada_mxn = t.merma_tradicional_mxn - t.merma_zeromerma_mxn;
-    t.reduccion_merma_pct = t.merma_tradicional_mxn ? (t.merma_zeromerma_mxn / t.merma_tradicional_mxn - 1) * 100 : 0;
+    t.merma_evitada_mxn = t.merma_tradicional_mxn - t.merma_opsia_mxn;
+    t.reduccion_merma_pct = t.merma_tradicional_mxn ? (t.merma_opsia_mxn / t.merma_tradicional_mxn - 1) * 100 : 0;
     const ins = insumo === 'todos' ? { clave: 'todos', nombre: 'Todos los productos', unidad: 'MXN' } : H.insumos[cols[0]];
     return { insumo: { clave: ins.clave, nombre: ins.nombre, unidad: ins.unidad }, agrupar, unidad: enPesos ? 'MXN' : ins.unidad,
              periodo: { desde: H.fechas[0], hasta: H.fechas[H.fechas.length - 1], dias: H.fechas.length,
@@ -812,6 +889,7 @@
         () => local.historial(agruparActual, insumo));
       mostrarError('#errorHistorial', '');
       pintarHistorial(r);
+      pintarRangoVisible();
     } catch (err) {
       mostrarError('#errorHistorial', `No se pudo cargar el historial: ${err.message}`);
     }
@@ -825,7 +903,7 @@
     $('#hisTradicional').textContent = mxn(t.compra_tradicional_mxn);
     $('#hisTradicionalSub').textContent = `Comprado "a ojo" en ${t.dias_comparables} días comparables`;
     $('#hisSugerida').textContent = mxn(t.compra_sugerida_mxn);
-    $('#hisSugeridaSub').textContent = `Demanda no cubierta: ${num(t.demanda_no_cubierta_zeromerma_pct, 2)}% (tradicional: ${num(t.demanda_no_cubierta_tradicional_pct, 2)}%)`;
+    $('#hisSugeridaSub').textContent = `Demanda no cubierta: ${num(t.demanda_no_cubierta_opsia_pct, 2)}% (tradicional: ${num(t.demanda_no_cubierta_tradicional_pct, 2)}%)`;
     $('#hisAhorro').textContent = mxn(t.ahorro_compra_mxn);
     $('#hisAhorroSub').textContent = t.compra_tradicional_mxn ? `${num(t.ahorro_compra_mxn / t.compra_tradicional_mxn * 100)}% menos en compras` : '';
     $('#hisMerma').textContent = mxn(t.merma_evitada_mxn);
@@ -853,7 +931,7 @@
         labels: r.serie.map((f) => f.etiqueta),
         datasets: [
           { type: 'bar', label: 'Compra Tradicional (registrada)', data: datos('compra_tradicional'), backgroundColor: COLORES.slate300, borderRadius: 3, order: 3 },
-          { type: 'bar', label: 'Compra Sugerida por ZeroMerma AI', data: datos('compra_sugerida'), backgroundColor: COLORES.emerald600, borderRadius: 3, order: 2 },
+          { type: 'bar', label: 'Compra Sugerida por Opsia', data: datos('compra_sugerida'), backgroundColor: COLORES.emerald600, borderRadius: 3, order: 2 },
           { type: 'line', label: 'Consumo Real', data: datos('consumo_real'), borderColor: COLORES.slate900, backgroundColor: COLORES.slate900,
             borderWidth: 2, pointRadius: r.serie.length > 60 ? 0 : 3, tension: 0.25, order: 1 },
         ],
@@ -863,6 +941,12 @@
         plugins: {
           legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, color: COLORES.slate900 } },
           tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y === null ? 'sin predicción' : valor(c.parsed.y, 2)}` } },
+          // Zoom (chartjs-plugin-zoom): rueda o pellizco para acercar, arrastrar para moverse.
+          zoom: {
+            limits: { x: { minRange: Math.min(6, Math.max(r.serie.length - 1, 1)) } },
+            pan: { enabled: true, mode: 'x', onPanComplete: () => pintarRangoVisible() },
+            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x', onZoomComplete: () => pintarRangoVisible() },
+          },
         },
         scales: {
           y: { beginAtZero: true, ticks: { color: COLORES.slate500, callback: (v) => (pesos ? '$' + new Intl.NumberFormat('es-MX', { notation: 'compact' }).format(v) : `${v} ${u}`) }, grid: { color: COLORES.slate200 } },
@@ -871,6 +955,23 @@
       },
     });
   }
+
+  /** Texto con el rango visible después de hacer zoom o moverse. */
+  function pintarRangoVisible() {
+    const g = graficas.historial;
+    if (!g) return;
+    const etiquetas = g.data.labels;
+    const ini = Math.max(0, Math.round(g.scales.x.min)), fin = Math.min(etiquetas.length - 1, Math.round(g.scales.x.max));
+    const completo = ini === 0 && fin === etiquetas.length - 1;
+    $('#rangoVisible').textContent = completo
+      ? `Mostrando todo: ${etiquetas.length} periodos`
+      : `Mostrando ${fin - ini + 1} de ${etiquetas.length}: ${etiquetas[ini]} – ${etiquetas[fin]}`;
+  }
+
+  const hayZoom = () => Boolean(graficas.historial && typeof graficas.historial.zoom === 'function');
+  $('#zoomMas').addEventListener('click', () => { if (hayZoom()) { graficas.historial.zoom(1.5); pintarRangoVisible(); } });
+  $('#zoomMenos').addEventListener('click', () => { if (hayZoom()) { graficas.historial.zoom(1 / 1.5); pintarRangoVisible(); } });
+  $('#zoomTodo').addEventListener('click', () => { if (hayZoom()) { graficas.historial.resetZoom(); pintarRangoVisible(); } });
 
   $$('#agruparHistorial [data-agrupar]').forEach((b) => b.addEventListener('click', () => {
     agruparActual = b.dataset.agrupar;
@@ -903,8 +1004,10 @@
       return;
     }
     await actualizarPlan();
+    actualizarBotonAgregar();
+    await recalcularLista();
     const vista = (location.hash || '#planeador').slice(1);
-    mostrarVista(['planeador', 'rescate', 'alerta', 'auditoria', 'historial'].includes(vista) ? vista : 'planeador');
+    mostrarVista(['planeador', 'rescate', 'alerta', 'historial'].includes(vista) ? vista : 'planeador');
   }
 
   async function iniciar() {

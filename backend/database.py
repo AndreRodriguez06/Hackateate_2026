@@ -1,11 +1,11 @@
 """
-ZeroMerma AI — Acceso a la base de datos SQLite
+Opsia — Acceso a la base de datos SQLite
 Archivo: /backend/database.py
 
 Funciones de consulta que comparten los endpoints. No contiene lógica HTTP.
 Las rutas se pueden cambiar con variables de entorno (útil para pruebas):
-    ZEROMERMA_DB      ruta del archivo SQLite   (por defecto data/restaurante.db)
-    ZEROMERMA_MODELO  ruta del modelo .pkl      (por defecto ml/modelo_rf.pkl)
+    OPSIA_DB      ruta del archivo SQLite   (por defecto data/restaurante.db)
+    OPSIA_MODELO  ruta del modelo .pkl      (por defecto ml/modelo_rf.pkl)
 """
 
 from __future__ import annotations
@@ -17,8 +17,8 @@ from datetime import datetime
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
-RUTA_DB = Path(os.getenv("ZEROMERMA_DB", RAIZ / "data" / "restaurante.db"))
-RUTA_MODELO = Path(os.getenv("ZEROMERMA_MODELO", RAIZ / "ml" / "modelo_rf.pkl"))
+RUTA_DB = Path(os.getenv("OPSIA_DB", RAIZ / "data" / "restaurante.db"))
+RUTA_MODELO = Path(os.getenv("OPSIA_MODELO", RAIZ / "ml" / "modelo_rf.pkl"))
 RUTA_FRONTEND = RAIZ / "frontend"
 
 # Semáforo de caducidad (horas restantes)

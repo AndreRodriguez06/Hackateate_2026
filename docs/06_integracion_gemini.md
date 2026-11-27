@@ -1,7 +1,7 @@
 # 06 · Integración de Google Gemini (sin chatbots)
 
 > **Apartado 6 · Orden 3.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado sin llave (`tests/test_gemini_service.py`, 20 pruebas; total del repositorio, 64).
+> Estado: ✅ implementado y probado sin llave (`tests/test_gemini_service.py`, 22 pruebas; total del repositorio, 65).
 > ⏳ **Pendiente:** probar con una `GEMINI_API_KEY` válida. Ver la sección 9.
 
 > ⚠️ Gemini trabaja sobre datos **SIMULADOS** (inventario, menú y precios del Apartado 2). La interfaz siempre indica si un resultado viene de Gemini o del modo respaldo.
@@ -22,11 +22,23 @@ No hay caja de chat ni conversación: el usuario pulsa un botón y recibe una pr
 | Medio | Uso |
 |---|---|
 | SDK oficial `google-genai` 1.33.0 (`from google import genai`; compatible con Python 3.10+) | Cliente de la API de Gemini. |
-| Modelo `gemini-2.5-flash` | Rápido y económico para tareas cortas; cambiable con `GEMINI_MODEL`. |
+| Modelo `gemini-3.5-flash-lite` | Rápido y económico para tareas cortas; soporta salidas estructuradas; cambiable con `GEMINI_MODEL`. |
 | Structured Outputs: `response_mime_type="application/json"` + `response_schema=<modelo Pydantic>` | La respuesta llega como JSON que cumple el esquema. |
 | Pydantic | Define los esquemas y valida la respuesta. |
 | `backend/gemini_service.py` | Las dos funciones, validaciones y modo respaldo. |
-| `tests/test_gemini_service.py` | 20 pruebas con respuestas simuladas del modelo, sin red. |
+| `tests/test_gemini_service.py` | 22 pruebas con respuestas simuladas del modelo, sin red. |
+
+### 2.1 Elección del modelo (revisado el 2026-11-27)
+
+| Dato | Fuente |
+|---|---|
+| `gemini-2.5-flash` ya no se ofrece a proyectos nuevos: solo sigue disponible para quienes lo usaban, sin fecha de apagado anunciada en la API de Gemini; Google recomienda 3.5 Flash-Lite o 3.8 Flash para proyectos nuevos. En Google Cloud (Vertex) su retiro está programado para el 20 de octubre de 2026. | Google, [Gemini deprecations](https://ai.google.dev/gemini-api/docs/deprecations) y [ciclo de vida en Google Cloud](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/model-versions), consultados el 2026-11-27 |
+| `gemini-3.5-flash-lite`: salidas estructuradas soportadas; USD 0.30 por millón de tokens de entrada y USD 2.50 por millón de salida (nivel estándar de pago). | Google, [modelo Gemini 3.5 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite) y [precios de la API](https://ai.google.dev/gemini-api/docs/pricing), consultados el 2026-11-27 |
+| `gemini-3.8-flash`: USD 0.75 entrada / 3.75 salida por millón hasta el 31/12/2026, y USD 1.50 / 7.50 desde el 1/1/2027. | Mismas fuentes |
+
+Por eso el modelo por defecto es **`gemini-3.5-flash-lite`**: mismo precio que tenía 2.5 Flash, disponible para llaves nuevas y con salidas estructuradas. Si la llave no tiene acceso a un modelo, el respaldo lo indica: "El modelo … no está disponible para esta llave".
+
+> No se ha probado una llamada exitosa con llave real (ver sección 9).
 
 ## 3. Configuración
 
@@ -39,7 +51,7 @@ python backend/main.py
 | Variable | Por defecto | Uso |
 |---|---|---|
 | `GEMINI_API_KEY` | (vacía) | Sin llave todo funciona en modo respaldo. |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Modelo a usar. |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Modelo a usar. |
 | `GEMINI_TIMEOUT_MS` | `15000` | Tiempo máximo de espera antes de pasar al respaldo. |
 
 Se leen de las variables de entorno o del archivo `.env` en la raíz. `.env` está en `.gitignore`: **la llave nunca se sube al repositorio**. `GET /api/salud` responde `gemini_configurado: true/false`.
@@ -52,7 +64,7 @@ sequenceDiagram
     participant API as FastAPI
     participant R as rescate_menu.py
     participant G as gemini_service.py
-    participant GM as Gemini 2.5 Flash
+    participant GM as Gemini 3.5 Flash-Lite
     UI->>API: POST /api/optimizar-menu
     API->>R: insumos críticos (SQLite)
     R->>G: generar_promociones_menu(críticos, menú)
@@ -108,7 +120,7 @@ Se definen como modelos Pydantic y se pasan en `response_schema`. El SDK los con
 Salida de la función (después de validar):
 
 ```json
-{ "modo_respaldo": false, "motivo_respaldo": null, "modelo": "gemini-2.5-flash",
+{ "modo_respaldo": false, "motivo_respaldo": null, "modelo": "gemini-3.5-flash-lite",
   "promociones": [ { "platillo_clave": "enchiladas_suizas", "platillo": "Enchiladas Suizas", "tipo": "descuento",
                      "descuento_pct": 25, "precio_normal_mxn": 120.0, "precio_oferta_mxn": 90,
                      "costo_porcion_mxn": 44.55, "insumos_criticos_usados": ["pollo", "crema"],
@@ -128,7 +140,7 @@ Salida de la función (después de validar):
 Salida de la función:
 
 ```json
-{ "modo_respaldo": false, "motivo_respaldo": null, "modelo": "gemini-2.5-flash", "motivo_sin_ficha": null,
+{ "modo_respaldo": false, "motivo_respaldo": null, "modelo": "gemini-3.5-flash-lite", "motivo_sin_ficha": null,
   "ficha": { "producto": "Enchiladas Suizas", "porciones": 4, "cantidad_aprox_kg": 2.1,
              "ventana_inicio": "16:00", "ventana_limite": "17:30", "horas_antes_del_cierre": 2.5,
              "recomendaciones_inocuidad": ["Mantener a 4 °C o menos.", "Llevar en hieleras cerradas.", "Servir hoy mismo."],
@@ -144,12 +156,12 @@ Técnicas usadas:
 3. **Precalcular lo numérico:** el prompt trae `descuento_maximo_rentable_pct`, `valor_critico_por_porcion_mxn` y `ventana_permitida`. El modelo elige dentro de límites; no hace aritmética de la que dependa el dinero.
 4. **Contexto estructurado en JSON:** la entrada es JSON, no prosa. Solo se envían los platillos candidatos (los que usan insumos críticos), no todo el menú.
 5. **Restricciones de marca:** español de México, ≤ 160 caracteres, sin precios en el texto y **nunca decir al comensal que algo está por caducar**.
-6. **Baja temperatura (0.3) y sin razonamiento extendido** (`thinking_budget=0`): respuestas consistentes y rápidas para una tarea operativa.
+6. **Baja temperatura (0.3):** respuestas consistentes para una tarea operativa. Si se configura un modelo de la familia 2.5, además se envía `thinking_budget=0` (sin razonamiento extendido, menor latencia); los modelos más nuevos usan su configuración por defecto.
 
 ### 6.1 Instrucción de sistema · Función A
 
 ```text
-Eres el motor de optimización de menú de ZeroMerma AI para un restaurante en México.
+Eres el motor de optimización de menú de Opsia para un restaurante en México.
 No conversas: devuelves únicamente JSON que cumple el esquema.
 
 Tarea: proponer promociones para vender HOY insumos que caducan en menos de 24 horas.
@@ -189,7 +201,7 @@ Contenido enviado (ejemplo real del 2026-11-26, con 1 de los 18 candidatos):
 ### 6.2 Instrucción de sistema · Función B
 
 ```text
-Eres el módulo de alertas de excedentes de ZeroMerma AI para un restaurante en México.
+Eres el módulo de alertas de excedentes de Opsia para un restaurante en México.
 No conversas: devuelves únicamente JSON que cumple el esquema.
 
 Tarea: redactar la ficha operativa para que un comedor comunitario o la red estudiantil recoja comida
@@ -240,6 +252,7 @@ Las dos funciones **nunca lanzan excepciones**: siempre devuelven la misma estru
 |---|---|---|
 | Sin `GEMINI_API_KEY` | "No hay GEMINI_API_KEY configurada." | Respaldo |
 | Llave inválida | "La GEMINI_API_KEY no es válida." | Respaldo (**probado contra la API real** con una llave falsa) |
+| Modelo no disponible para la llave (404) | "El modelo … no está disponible para esta llave. Prueba GEMINI_MODEL=gemini-3.5-flash-lite." | Respaldo |
 | Cuota agotada (429) | "Se agotó la cuota de Gemini por ahora." | Respaldo |
 | Sin permiso para el modelo (401/403) | "La llave de Gemini no tiene permiso para este modelo." | Respaldo |
 | Sin internet o lentitud (> 15 s) | "Gemini no respondió a tiempo (…)" o "Falló la llamada…" | Respaldo |
@@ -261,11 +274,11 @@ El tiempo máximo de espera (15 s) evita que la demo se congele si la red es len
 **Sin llave (lo que ya se probó):**
 
 ```bash
-python -m unittest discover -s tests -v     # 64 pruebas, 20 de Gemini
+python -m unittest discover -s tests -v     # 65 pruebas, 22 de Gemini
 python backend/gemini_service.py            # imprime promociones y ficha en modo respaldo
 ```
 
-Las 20 pruebas de Gemini comprueban:
+Las 22 pruebas de Gemini comprueban:
 - candidatos correctos;
 - respaldo sin llave, y también con la llave de ejemplo `tu_api_key_aqui`;
 - respuesta válida aceptada;
@@ -273,7 +286,8 @@ Las 20 pruebas de Gemini comprueban:
 - falla de red;
 - límites del esquema;
 - ficha: respaldo con ventana 16:00–18:00, respuesta válida, rechazo de porciones cambiadas, rechazo de ventana fuera del límite, y sin ventana viable a las 17:45;
-- forma de la llamada al SDK: modelo, `response_mime_type`, `response_schema`, instrucción de sistema; texto JSON cuando `parsed` viene vacío; JSON inválido.
+- forma de la llamada al SDK: modelo, `response_mime_type`, `response_schema`, instrucción de sistema; `thinking_budget` solo con la familia 2.5; texto JSON cuando `parsed` viene vacío; JSON inválido;
+- modelo no disponible para la llave (404).
 
 Además se probó la llamada real al servidor de Google con una llave falsa: respondió `400 API key not valid` y el sistema pasó al respaldo con el motivo "La GEMINI_API_KEY no es válida.".
 
@@ -281,7 +295,7 @@ Además se probó la llamada real al servidor de Google con una llave falsa: res
 
 1. Poner la llave en `.env` y ejecutar `python backend/gemini_service.py`.
 2. Revisar que diga `"modo_respaldo": false` en ambas funciones y que los textos sean adecuados.
-3. Abrir la Vista 2 y pulsar **Optimizar Menú**: el distintivo debe decir **Generado con Gemini · gemini-2.5-flash**.
+3. Abrir la Vista 2 y pulsar **Optimizar Menú**: el distintivo debe decir **Generado con Gemini · gemini-3.5-flash-lite**.
 4. Si sale modo respaldo, el motivo en pantalla dice qué corregir.
 
 > No pudimos probar una llamada exitosa porque no tenemos llave en este entorno. La forma de la petición está verificada con el SDK y contra el servidor de Google hasta la autenticación; el contenido real de las respuestas de Gemini todavía no se ha observado.

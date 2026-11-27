@@ -1,11 +1,11 @@
 """
-ZeroMerma AI — Historial de compras (vista 5)
+Opsia — Historial de compras (vista 5)
 Archivo: /backend/services/historial_compras.py
 
 Muestra, para todo el historial guardado en la base de datos:
   * lo que se compró cada día con el método tradicional ("a ojo"),
   * lo que realmente se consumió,
-  * lo que habría sugerido ZeroMerma AI, predicho SIN ver ese día
+  * lo que habría sugerido Opsia, predicho SIN ver ese día
     (modelo con ventana creciente, ver ml/modelo_demanda.py: predicciones_historicas),
 agrupado por día, semana o mes, para un insumo o para todos (en $MXN, porque kg, L y
 piezas no se pueden sumar entre sí).
@@ -90,7 +90,7 @@ def construir(con: sqlite3.Connection, paquete: dict, agrupar: str = "semana", i
     diario = {
         "compra_tradicional": en_unidad(trad), "consumo_real": en_unidad(real), "compra_sugerida": en_unidad(zm0),
         "compra_tradicional_mxn": en_mxn(trad), "compra_sugerida_mxn": en_mxn(zm0),
-        "merma_tradicional_mxn": en_mxn(merma_trad), "merma_zeromerma_mxn": en_mxn(merma_zm),
+        "merma_tradicional_mxn": en_mxn(merma_trad), "merma_opsia_mxn": en_mxn(merma_zm),
     }
 
     # --- Agrupación por periodo ---
@@ -111,11 +111,11 @@ def construir(con: sqlite3.Connection, paquete: dict, agrupar: str = "semana", i
         fila = {**g}
         for nombre in ("compra_tradicional", "consumo_real", "compra_tradicional_mxn", "merma_tradicional_mxn"):
             fila[nombre] = round(float(diario[nombre][idx].sum()), 2)
-        for nombre in ("compra_sugerida", "compra_sugerida_mxn", "merma_zeromerma_mxn"):
+        for nombre in ("compra_sugerida", "compra_sugerida_mxn", "merma_opsia_mxn"):
             fila[nombre] = round(float(diario[nombre][idx].sum()), 2) if completo else None
         fila["ahorro_compra_mxn"] = (round(fila["compra_tradicional_mxn"] - fila["compra_sugerida_mxn"], 2)
                                      if completo else None)
-        fila["merma_evitada_mxn"] = (round(fila["merma_tradicional_mxn"] - fila["merma_zeromerma_mxn"], 2)
+        fila["merma_evitada_mxn"] = (round(fila["merma_tradicional_mxn"] - fila["merma_opsia_mxn"], 2)
                                      if completo else None)
         serie.append(fila)
 
@@ -128,14 +128,14 @@ def construir(con: sqlite3.Connection, paquete: dict, agrupar: str = "semana", i
         "compra_tradicional_mxn": round(float((trad[c][:, col] * precios[col]).sum()), 2),
         "compra_sugerida_mxn": round(float((zm0[c][:, col] * precios[col]).sum()), 2),
         "merma_tradicional_mxn": round(float((merma_trad[c][:, col] * precios[col]).sum()), 2),
-        "merma_zeromerma_mxn": round(float((merma_zm[c][:, col] * precios[col]).sum()), 2),
+        "merma_opsia_mxn": round(float((merma_zm[c][:, col] * precios[col]).sum()), 2),
         "merma_evitada_kg": round(float((merma_trad[c][:, col] - merma_zm[c][:, col])[:, kg_col].sum()), 2),
         "demanda_no_cubierta_tradicional_pct": round(float((faltante_trad[c][:, col] * precios[col]).sum() / valor_real * 100), 2) if valor_real else 0.0,
-        "demanda_no_cubierta_zeromerma_pct": round(float((faltante_zm[c][:, col] * precios[col]).sum() / valor_real * 100), 2) if valor_real else 0.0,
+        "demanda_no_cubierta_opsia_pct": round(float((faltante_zm[c][:, col] * precios[col]).sum() / valor_real * 100), 2) if valor_real else 0.0,
     }
     totales["ahorro_compra_mxn"] = round(totales["compra_tradicional_mxn"] - totales["compra_sugerida_mxn"], 2)
-    totales["merma_evitada_mxn"] = round(totales["merma_tradicional_mxn"] - totales["merma_zeromerma_mxn"], 2)
-    totales["reduccion_merma_pct"] = (round((totales["merma_zeromerma_mxn"] / totales["merma_tradicional_mxn"] - 1) * 100, 1)
+    totales["merma_evitada_mxn"] = round(totales["merma_tradicional_mxn"] - totales["merma_opsia_mxn"], 2)
+    totales["reduccion_merma_pct"] = (round((totales["merma_opsia_mxn"] / totales["merma_tradicional_mxn"] - 1) * 100, 1)
                                       if totales["merma_tradicional_mxn"] else 0.0)
 
     primer = historico.get("primer_dia_comparable")

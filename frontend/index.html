@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZeroMerma AI</title>
-  <meta name="description" content="ZeroMerma AI: control operativo de cocina para reducir la merma de alimentos. Datos SIMULADOS." />
+  <title>Opsia</title>
+  <meta name="description" content="Opsia: control operativo de cocina para reducir la merma de alimentos. Datos SIMULADOS." />
 
   <!-- Dependencias vía CDN, versiones fijas (sin instalación ni compilación) -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
   <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
 
   <style>
@@ -42,7 +44,7 @@
         </div>
         <div class="min-w-0">
           <h1 class="font-semibold text-base sm:text-lg leading-tight">
-            ZeroMerma AI <span class="block sm:inline text-slate-400 font-normal text-sm sm:text-lg"><span class="hidden sm:inline">| </span>Control Operativo de Cocina</span>
+            Opsia <span class="block sm:inline text-slate-400 font-normal text-sm sm:text-lg"><span class="hidden sm:inline">| </span>Control Operativo de Cocina</span>
           </h1>
           <div class="flex flex-wrap items-center gap-2 mt-1">
             <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/40 text-xs font-medium">
@@ -78,10 +80,8 @@
             <i data-lucide="sparkles" class="w-4 h-4"></i> 2. Rescate Rentable en Menú (Gemini)</button>
           <button role="tab" data-tab="alerta" aria-selected="false" class="tab-btn whitespace-nowrap px-2.5 py-2 rounded-lg text-sm xl:text-[13px] 2xl:text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center gap-2">
             <i data-lucide="bell-ring" class="w-4 h-4"></i> 3. Alerta Temprana de Excedentes</button>
-          <button role="tab" data-tab="auditoria" aria-selected="false" class="tab-btn whitespace-nowrap px-2.5 py-2 rounded-lg text-sm xl:text-[13px] 2xl:text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center gap-2">
-            <i data-lucide="history" class="w-4 h-4"></i> 4. Auditoría y Backtesting</button>
           <button role="tab" data-tab="historial" aria-selected="false" class="tab-btn whitespace-nowrap px-2.5 py-2 rounded-lg text-sm xl:text-[13px] 2xl:text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/60 transition flex items-center gap-2">
-            <i data-lucide="package-search" class="w-4 h-4"></i> 5. Historial de Compras</button>
+            <i data-lucide="package-search" class="w-4 h-4"></i> 4. Historial de Compras</button>
         </div>
       </div>
     </nav>
@@ -122,6 +122,8 @@
               <input id="margen" type="range" min="0" max="25" step="1" value="8" class="w-full" />
               <div class="flex justify-between text-xs text-slate-400 mt-1"><span>0%</span><span>25%</span></div>
               <p id="margenRecomendado" class="mt-2 text-xs text-slate-500"></p>
+              <button id="agregarLista" type="button" class="mt-3 w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-emerald-300 transition disabled:opacity-60">
+                <i data-lucide="list-plus" class="w-4 h-4"></i> <span id="agregarListaTexto">Agregar a la lista de compras</span></button>
             </div>
 
             <div>
@@ -193,6 +195,35 @@
               <div class="flex items-center justify-between text-emerald-100 text-xs font-medium"><span>Merma evitada vs. compra habitual</span><i data-lucide="recycle" class="w-4 h-4"></i></div>
               <p id="kpiMerma" class="tabular text-2xl font-semibold mt-2">—</p>
               <p id="kpiMermaSub" class="text-xs text-emerald-100 mt-1"></p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div class="min-w-0">
+                <h3 class="font-semibold flex items-center gap-2"><i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600"></i> Lista de compras</h3>
+                <p id="listaContexto" class="text-xs text-slate-500"></p>
+              </div>
+              <div class="flex flex-wrap gap-2 text-xs">
+                <button id="copiarLista" type="button" class="px-2.5 py-1.5 rounded-md border border-slate-300 hover:bg-slate-50 font-medium inline-flex items-center gap-1 disabled:opacity-50"><i data-lucide="copy" class="w-3.5 h-3.5"></i> Copiar</button>
+                <button id="descargarLista" type="button" class="px-2.5 py-1.5 rounded-md border border-slate-300 hover:bg-slate-50 font-medium inline-flex items-center gap-1 disabled:opacity-50"><i data-lucide="download" class="w-3.5 h-3.5"></i> CSV</button>
+                <button id="vaciarLista" type="button" class="px-2.5 py-1.5 rounded-md border border-slate-300 hover:bg-rose-50 hover:text-rose-700 font-medium inline-flex items-center gap-1 disabled:opacity-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Vaciar</button>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm min-w-[560px]">
+                <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                  <tr>
+                    <th class="text-left font-medium px-4 py-2.5">Insumo</th>
+                    <th class="text-right font-medium px-4 py-2.5">Comprar</th>
+                    <th class="text-right font-medium px-4 py-2.5">Margen</th>
+                    <th class="text-right font-medium px-4 py-2.5">Costo</th>
+                    <th class="px-2 py-2.5"><span class="sr-only">Quitar</span></th>
+                  </tr>
+                </thead>
+                <tbody id="tablaLista" class="divide-y divide-slate-100"></tbody>
+                <tfoot id="pieLista" class="bg-slate-50 font-semibold"></tfoot>
+              </table>
             </div>
           </div>
 
@@ -338,79 +369,11 @@
       </div>
     </section>
 
-    <!-- ============================ VISTA 4 · AUDITORÍA ============================ -->
-    <section id="vista-auditoria" data-vista class="hidden fade-in">
-      <div class="mb-5 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div>
-          <h2 class="text-xl sm:text-2xl font-semibold">Auditoría y "Máquina del Tiempo"</h2>
-          <p id="periodoAuditoria" class="text-sm text-slate-500">Backtesting: ¿qué habría pasado en los últimos 7 días si se hubiera comprado con ZeroMerma AI?</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <label for="insumoAuditoria" class="text-sm text-slate-600 whitespace-nowrap">Gráfica de</label>
-          <select id="insumoAuditoria" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
-        </div>
-      </div>
-
-      <div id="errorAuditoria" class="hidden rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 mb-4" role="alert"></div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Reducción relativa de merma</span><i data-lucide="trending-down" class="w-4 h-4 text-emerald-600"></i></div>
-          <p id="audReduccion" class="tabular text-3xl font-semibold mt-2 text-emerald-600">—</p>
-          <p class="text-xs text-slate-500 mt-1">vs. compra tradicional, mismos días</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Merma evitada</span><i data-lucide="scale" class="w-4 h-4 text-emerald-600"></i></div>
-          <p id="audKg" class="tabular text-3xl font-semibold mt-2">—</p>
-          <p class="text-xs text-slate-500 mt-1">insumos medidos en kg</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Merma evitada en dinero</span><i data-lucide="piggy-bank" class="w-4 h-4 text-emerald-600"></i></div>
-          <p id="audMxn" class="tabular text-3xl font-semibold mt-2">—</p>
-          <p class="text-xs text-slate-500 mt-1">46 insumos, precios SIMULADOS</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Demanda no cubierta</span><i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i></div>
-          <p id="audCobertura" class="tabular text-3xl font-semibold mt-2">—</p>
-          <p id="audCoberturaSub" class="text-xs text-slate-500 mt-1"></p>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-6">
-        <div class="mb-3">
-          <h3 id="tituloGraficaAuditoria" class="font-semibold">Comparativa diaria</h3>
-          <p class="text-xs text-slate-500">La distancia entre la compra y la demanda real es sobrante (merma potencial) o faltante.</p>
-        </div>
-        <div class="relative h-72 sm:h-80"><canvas id="graficaAuditoria" aria-label="Gráfica comparativa de compras y demanda" role="img"></canvas></div>
-      </div>
-
-      <details class="group bg-white rounded-2xl border border-slate-200 shadow-sm">
-        <summary class="cursor-pointer list-none px-5 py-4 flex items-center justify-between gap-3">
-          <span class="font-semibold flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4 text-slate-500"></i> Fuentes, Supuestos y Metodología</span>
-          <i data-lucide="chevron-down" class="chev w-5 h-5 text-slate-400 transition-transform"></i>
-        </summary>
-        <div class="px-5 pb-5 text-sm text-slate-600 space-y-3 border-t border-slate-100 pt-4">
-          <div class="flex gap-3 rounded-lg bg-amber-50 border border-amber-200 p-3"><i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 text-amber-600 shrink-0"></i>
-            <p class="text-amber-900"><strong>Declaración:</strong> todos los registros (ventas, afluencia, clima, inventario, recetas y precios) son <strong>SIMULADOS</strong> para validar el prototipo. No representan las operaciones de ningún establecimiento real.</p></div>
-          <div class="flex gap-3"><i data-lucide="tag" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
-            <p><strong class="text-slate-800">Precios de insumos:</strong> valores SIMULADOS provisionales. La fuente de referencia prevista es <em>Quién es Quién en los Precios</em> de PROFECO; la sustitución por precios consultados está pendiente y documentada en <code>docs/02_base_de_datos.md</code>.</p></div>
-          <div class="flex gap-3"><i data-lucide="globe" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
-            <p><strong class="text-slate-800">Contexto del problema:</strong> el desperdicio de alimentos en servicios de comida está documentado por la FAO y el PNUMA (Programa de la ONU para el Medio Ambiente, <em>Food Waste Index Report</em>). Las cifras citadas se presentan con su fuente en el plan de negocios (Apartado 8).</p></div>
-          <div class="flex gap-3"><i data-lucide="flask-conical" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
-            <div><p><strong class="text-slate-800">Metodología:</strong> <span id="metodologiaAuditoria">el modelo se reentrena solo con los días anteriores al periodo evaluado, para no "ver el futuro".</span></p>
-              <ul class="list-disc ml-5 mt-1 space-y-0.5">
-                <li>Compra tradicional: lo que se compró "a ojo" (día más fuerte de la semana anterior más un colchón).</li>
-                <li>Compra ZeroMerma: predicción × (1 + margen recomendado del insumo).</li>
-                <li>Merma: sobrante × fracción que caduca según la vida útil del insumo.</li>
-              </ul></div></div>
-        </div>
-      </details>
-    </section>
-    <!-- ============================ VISTA 5 · HISTORIAL DE COMPRAS ============================ -->
+    <!-- ============================ VISTA 4 · HISTORIAL DE COMPRAS ============================ -->
     <section id="vista-historial" data-vista class="hidden fade-in">
       <div class="mb-5">
         <h2 class="text-xl sm:text-2xl font-semibold">Historial de Compras</h2>
-        <p class="text-sm text-slate-500">Lo que el restaurante compró cada día (registros de la base de datos), lo que realmente consumió y lo que habría sugerido ZeroMerma AI.</p>
+        <p class="text-sm text-slate-500">Lo que el restaurante compró cada día (registros de la base de datos), lo que realmente consumió y lo que habría sugerido Opsia.</p>
       </div>
 
       <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-4 flex flex-col md:flex-row md:items-end gap-4">
@@ -438,7 +401,7 @@
           <p id="hisTradicionalSub" class="text-xs text-slate-500 mt-1"></p>
         </div>
         <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Con ZeroMerma AI</span><i data-lucide="cpu" class="w-4 h-4 text-emerald-600"></i></div>
+          <div class="flex items-center justify-between text-slate-500 text-xs font-medium"><span>Con Opsia</span><i data-lucide="cpu" class="w-4 h-4 text-emerald-600"></i></div>
           <p id="hisSugerida" class="tabular text-2xl font-semibold mt-2">—</p>
           <p id="hisSugeridaSub" class="text-xs text-slate-500 mt-1"></p>
         </div>
@@ -458,6 +421,15 @@
         <div class="mb-3">
           <h3 id="tituloGraficaHistorial" class="font-semibold">Compras por periodo</h3>
           <p class="text-xs text-slate-500">Barras: lo comprado. Línea: lo que realmente se consumió. Donde la barra gris supera la línea, sobró; si la barra verde queda debajo, habría faltado.</p>
+          <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <div class="inline-flex rounded-lg border border-slate-300 overflow-hidden" role="group" aria-label="Zoom de la gráfica">
+              <button id="zoomMas" type="button" class="px-2.5 py-1.5 hover:bg-slate-50 inline-flex items-center gap-1 font-medium"><i data-lucide="zoom-in" class="w-3.5 h-3.5"></i> Acercar</button>
+              <button id="zoomMenos" type="button" class="px-2.5 py-1.5 border-l border-slate-300 hover:bg-slate-50 inline-flex items-center gap-1 font-medium"><i data-lucide="zoom-out" class="w-3.5 h-3.5"></i> Alejar</button>
+              <button id="zoomTodo" type="button" class="px-2.5 py-1.5 border-l border-slate-300 hover:bg-slate-50 inline-flex items-center gap-1 font-medium"><i data-lucide="maximize-2" class="w-3.5 h-3.5"></i> Ver todo</button>
+            </div>
+            <span id="rangoVisible" class="text-slate-500 tabular"></span>
+            <span class="text-slate-400 hidden sm:inline">· Rueda del ratón o pellizco para hacer zoom, arrastra para moverte</span>
+          </div>
         </div>
         <div class="relative h-72 sm:h-96"><canvas id="graficaHistorial" aria-label="Gráfica de compras por periodo" role="img"></canvas></div>
       </div>
@@ -474,7 +446,7 @@
                 <th class="text-left font-medium px-4 py-3">Periodo</th>
                 <th class="text-right font-medium px-4 py-3">Comprado</th>
                 <th class="text-right font-medium px-4 py-3">Consumido</th>
-                <th class="text-right font-medium px-4 py-3">Sugerido ZeroMerma</th>
+                <th class="text-right font-medium px-4 py-3">Sugerido Opsia</th>
                 <th class="text-right font-medium px-4 py-3">Ahorro en compra</th>
                 <th class="text-right font-medium px-4 py-3">Merma evitada</th>
               </tr>
@@ -486,16 +458,25 @@
 
       <details class="mt-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
         <summary class="cursor-pointer list-none px-5 py-4 flex items-center justify-between gap-3">
-          <span class="font-semibold flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4 text-slate-500"></i> Cómo se calcula</span>
+          <span class="font-semibold flex items-center gap-2"><i data-lucide="book-open" class="w-4 h-4 text-slate-500"></i> Fuentes, Supuestos y Metodología</span>
           <i data-lucide="chevron-down" class="chev w-5 h-5 text-slate-400 transition-transform"></i>
         </summary>
-        <p id="metodologiaHistorial" class="px-5 pb-5 text-sm text-slate-600 border-t border-slate-100 pt-4"></p>
+        <div class="px-5 pb-5 text-sm text-slate-600 space-y-3 border-t border-slate-100 pt-4">
+          <div class="flex gap-3 rounded-lg bg-amber-50 border border-amber-200 p-3"><i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 text-amber-600 shrink-0"></i>
+            <p class="text-amber-900"><strong>Declaración:</strong> todos los registros (ventas, afluencia, clima, inventario, recetas y precios) son <strong>SIMULADOS</strong> para validar el prototipo. No representan las operaciones de ningún establecimiento real.</p></div>
+          <div class="flex gap-3"><i data-lucide="tag" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
+            <p><strong class="text-slate-800">Precios de insumos:</strong> valores SIMULADOS provisionales. La fuente de referencia prevista es <em>Quién es Quién en los Precios</em> de PROFECO; la sustitución por precios consultados está pendiente y documentada en <code>docs/02_base_de_datos.md</code>.</p></div>
+          <div class="flex gap-3"><i data-lucide="globe" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
+            <p><strong class="text-slate-800">Contexto del problema:</strong> el desperdicio de alimentos en servicios de comida está documentado por la FAO y el PNUMA (Programa de la ONU para el Medio Ambiente, <em>Food Waste Index Report</em>). Las cifras citadas se presentan con su fuente en el plan de negocios (Apartado 8).</p></div>
+          <div class="flex gap-3"><i data-lucide="flask-conical" class="w-4 h-4 mt-0.5 text-emerald-600 shrink-0"></i>
+            <p><strong class="text-slate-800">Metodología:</strong> <span id="metodologiaHistorial"></span></p></div>
+        </div>
       </details>
     </section>
   </main>
 
   <footer class="max-w-7xl mx-auto px-4 sm:px-6 pb-8 text-xs text-slate-400">
-    ZeroMerma AI · Prototipo de validación · Todos los datos son SIMULADOS.
+    Opsia · Prototipo de validación · Todos los datos son SIMULADOS.
   </footer>
 
   <div id="toasts" class="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-6 z-50 flex flex-col gap-2 items-stretch sm:items-end" aria-live="polite"></div>

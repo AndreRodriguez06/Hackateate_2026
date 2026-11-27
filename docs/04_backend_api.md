@@ -1,7 +1,7 @@
 # 04 · Backend y API REST (FastAPI)
 
 > **Apartado 4 · Orden 2.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_api.py`, 20 pruebas). Total del repositorio: 64 pruebas.
+> Estado: ✅ implementado y probado (`tests/test_api.py`, 19 pruebas). Total del repositorio: 65 pruebas.
 
 > ⚠️ **Todas las respuestas provienen de datos SIMULADOS.** Cada respuesta incluye `es_simulado: true`, y los lotes del inventario lo indican uno por uno.
 
@@ -27,16 +27,16 @@ python backend/main.py                  # o: uvicorn backend.main:app --reload
 | No hay lotes vigentes a menos de 24 h (datos de otro día) | Refresca las caducidades del inventario. |
 | No existe `ml/modelo_rf.pkl` | Entrena el modelo (Apartado 3, ≈ 5 s). |
 
-Se desactiva con `ZEROMERMA_AUTOPREPARAR=0`.
+Se desactiva con `OPSIA_AUTOPREPARAR=0`.
 
 | Variable de entorno | Uso | Valor por defecto |
 |---|---|---|
-| `ZEROMERMA_DB` | Ruta de la base SQLite | `data/restaurante.db` |
-| `ZEROMERMA_MODELO` | Ruta del modelo | `ml/modelo_rf.pkl` |
-| `ZEROMERMA_AUTOPREPARAR` | `0` desactiva la preparación automática | `1` |
+| `OPSIA_DB` | Ruta de la base SQLite | `data/restaurante.db` |
+| `OPSIA_MODELO` | Ruta del modelo | `ml/modelo_rf.pkl` |
+| `OPSIA_AUTOPREPARAR` | `0` desactiva la preparación automática | `1` |
 | `PORT` | Puerto con `python backend/main.py` | `8000` |
 | `GEMINI_API_KEY` | Llave de Gemini (también se lee de `.env`) | sin definir → modo `fallback` |
-| `GEMINI_MODEL` · `GEMINI_TIMEOUT_MS` | Modelo y tiempo máximo de espera | `gemini-2.5-flash` · `15000` |
+| `GEMINI_MODEL` · `GEMINI_TIMEOUT_MS` | Modelo y tiempo máximo de espera | `gemini-3.5-flash-lite` · `15000` |
 
 ## 3. Arquitectura del backend
 
@@ -60,7 +60,7 @@ flowchart LR
 | `backend/database.py` | Rutas configurables, conexión (`sesion()` abre y cierra), semáforo de caducidad, menú con recetas y costos, ventas promedio. |
 | `backend/services/rescate_menu.py` | Promociones: reglas locales, validación de lo que proponga Gemini y bitácora. |
 | `backend/services/alerta_excedente.py` | Proyección de sobrante, ventana de recolección, ficha de rescate y bitácora. |
-| `ml/modelo_demanda.py` | `predecir_compra()` y `backtest()` (Apartado 3). |
+| `ml/modelo_demanda.py` | `predecir_compra()` y predicciones históricas fuera de muestra (Apartado 3). |
 
 ### Cómo viaja una petición
 
@@ -270,7 +270,7 @@ Cálculos. Los supuestos son SIMULADOS y están como constantes en `alerta_exced
 | `hora_agotamiento_estimada` | Si la proyección supera lo preparado, cuándo se acabaría. |
 | Nota de inocuidad | Si la receta lleva proteína o lácteo: refrigerar a 4 °C o menos y consumir el mismo día. |
 
-> El volumen por platillo es realista para un menú de 30 platillos (≈ 10 enchiladas al día), por lo que los sobrantes son de pocas porciones. El prototipo `prueba1/` mostraba 18 porciones como ejemplo ilustrativo.
+> El volumen por platillo es realista para un menú de 30 platillos (≈ 10 enchiladas al día), por lo que los sobrantes son de pocas porciones.
 
 Errores: **422** formato de hora inválido · **400** hora fuera del servicio · **404** platillo inexistente.
 
@@ -285,38 +285,9 @@ Marca la ficha como enviada en la tabla `alertas_excedente`. **El envío es SIMU
 
 Error: **404** si la alerta no existe.
 
-### 4.8 `GET /api/auditoria` · Vista 4
+### 4.8 `GET /api/historial-compras` · Vista 4
 
-Backtesting de los últimos días **cerrados**: compra tradicional contra demanda real contra sugerencia de ZeroMerma AI.
-
-| Parámetro (query) | Tipo | Por defecto | Descripción |
-|---|---|---|---|
-| `dias` | entero 1–30 | `7` | Días a comparar. |
-| `insumo` | clave | `pollo` | Insumo de la serie diaria para la gráfica. |
-| `margen` | decimal 0–0.25 | recomendado por insumo | Margen fijo opcional. |
-
-```json
-{ "insumo": { "clave": "pollo", "nombre": "Pechuga de pollo", "unidad": "kg", "margen_aplicado": 0.144 },
-  "periodo": { "desde": "2026-11-19", "hasta": "2026-11-25", "dias": 7, "modelo_entrenado_hasta": "2026-11-18" },
-  "serie": [ { "fecha": "2026-11-19", "compra_tradicional": 22.0, "demanda_real": 11.42, "compra_sugerida": 12.33 } ],
-  "totales": {
-    "tradicional": { "compra_mxn": 78862.5, "merma_kg": 174.85, "merma_mxn": 12739.03, "demanda_no_cubierta_pct": 0.04 },
-    "zeromerma":   { "compra_mxn": 46943.59, "merma_kg": 27.86, "merma_mxn": 1920.15, "demanda_no_cubierta_pct": 1.03 },
-    "ahorro_compra_mxn": 31918.91, "merma_evitada_kg": 146.99, "merma_evitada_mxn": 10818.88, "reduccion_merma_pct": -84.9 },
-  "metodologia": "Modelo reentrenado solo con días anteriores al periodo (sin fuga de datos). ...",
-  "es_simulado": true }
-```
-
-Cómo se calcula:
-- **Sin fuga de datos:** el modelo guardado ya vio los últimos días, así que `backtest()` entrena un modelo **nuevo** solo con los días anteriores al periodo (`modelo_entrenado_hasta` < `desde`). El resultado se guarda en memoria mientras la base no cambie.
-- **Merma** = máx(compra − consumo real, 0) × fracción que caduca según la vida útil (misma regla del Apartado 2).
-- **kg** solo suma insumos medidos en kg; **$MXN** suma los 46 insumos.
-- **Simplificación:** cada día se evalúa por separado; no se arrastra el sobrante al día siguiente.
-- **Lectura honesta de esta semana:** incluye el Buen Fin. La merma baja 85 %, pero la demanda no cubierta con ZeroMerma (1.03 %) es mayor que con la compra tradicional (0.04 %): en días extraordinarios, comprar de más cubrió mejor. Sobre todo el historial (sección 4.9) la demanda no cubierta es similar en ambos (0.98 % contra 1.00 %).
-
-### 4.9 `GET /api/historial-compras` · Vista 5
-
-Lo que se compró **cada día** según la base de datos (compra tradicional), lo que se consumió y lo que habría sugerido ZeroMerma AI, para **todo el historial**.
+Lo que se compró **cada día** según la base de datos (compra tradicional), lo que se consumió y lo que habría sugerido Opsia, para **todo el historial**.
 
 | Parámetro (query) | Tipo | Por defecto | Descripción |
 |---|---|---|---|
@@ -332,12 +303,12 @@ Lo que se compró **cada día** según la base de datos (compra tradicional), lo
                "dias": 25, "dias_comparables": 25,
                "compra_tradicional": 275648.5, "consumo_real": 160116.62, "compra_sugerida": 177512.65,
                "compra_tradicional_mxn": 275648.5, "compra_sugerida_mxn": 177512.65,
-               "merma_tradicional_mxn": 40349.82, "merma_zeromerma_mxn": 6954.63,
+               "merma_tradicional_mxn": 40349.82, "merma_opsia_mxn": 6954.63,
                "ahorro_compra_mxn": 98135.85, "merma_evitada_mxn": 33395.19 } ],
   "totales": { "dias_comparables": 305, "compra_tradicional_mxn": 3073056.5, "compra_sugerida_mxn": 2158100.02,
-               "ahorro_compra_mxn": 914956.48, "merma_tradicional_mxn": 411235.19, "merma_zeromerma_mxn": 113674.79,
+               "ahorro_compra_mxn": 914956.48, "merma_tradicional_mxn": 411235.19, "merma_opsia_mxn": 113674.79,
                "merma_evitada_mxn": 297560.4, "merma_evitada_kg": 4100.28, "reduccion_merma_pct": -72.4,
-               "demanda_no_cubierta_tradicional_pct": 1.0, "demanda_no_cubierta_zeromerma_pct": 0.98 },
+               "demanda_no_cubierta_tradicional_pct": 1.0, "demanda_no_cubierta_opsia_pct": 0.98 },
   "metodologia": "…", "es_simulado": true }
 ```
 
@@ -359,7 +330,7 @@ Errores: **404** insumo inexistente · **422** agrupación inválida · **503** 
 | Lógica en `services/`, HTTP en `main.py` | Todo en `main.py` | Cada integrante puede explicar y probar una pieza sin leer todo. |
 | El backend recalcula las cifras de Gemini | Usar los números del LLM | Un LLM puede equivocarse en aritmética; la rentabilidad no se delega. |
 | Modo `fallback` con reglas | Error si Gemini falla | La demo funciona sin internet ni cuota. |
-| Backtest con modelo reentrenado | Usar el modelo guardado | El guardado ya vio esos días: sería hacer trampa. |
+| Historial con predicciones fuera de muestra | Usar el modelo guardado | El guardado ya vio esos días: sería hacer trampa. |
 | Preparación automática al arrancar | Pedir 3 comandos | "Clone & Run" real; los datos de otro día se refrescan solos. |
 | `sesion()` cierra la conexión | `with sqlite3.connect()` | El `with` de sqlite3 solo hace commit y deja conexiones abiertas. |
 
@@ -368,22 +339,21 @@ Errores: **404** insumo inexistente · **422** agrupación inválida · **503** 
 | Elemento | Origen |
 |---|---|
 | Inventario, ventas, recetas, precios y compras | **SIMULADO** (Apartado 2). |
-| Predicciones y backtest | Modelo real entrenado con datos **SIMULADOS** (Apartado 3). |
+| Predicciones e historial | Modelo real entrenado con datos **SIMULADOS** (Apartado 3). |
 | Elasticidad del descuento (×2), factor de costo mínimo (1.5), curva de ventas por hora, horario 09:00–20:00 | **Supuestos SIMULADOS** del prototipo, en constantes fáciles de cambiar. |
 | Envío del aviso al comedor | **SIMULADO**: solo se registra en la base. |
 
 ## 7. Cómo verificar que funciona
 
-1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 9 endpoints.
+1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 8 endpoints.
 2. En `/docs`, probar `POST /api/predecir` con margen `0.02`: `riesgo_desabasto: true`.
-3. `python -m unittest discover -s tests -v`: 64 pruebas. Las 20 de la API comprueban:
+3. `python -m unittest discover -s tests -v`: 65 pruebas. Las 19 de la API comprueban:
    - el arranque genera datos y modelo;
    - el inventario está ordenado y con el semáforo correcto, y el filtro por estado funciona;
    - la predicción cumple la fórmula, alerta el desabasto y responde 422/400 a entradas inválidas;
    - las promociones solo usan platillos del menú con insumos críticos y precio ≥ 1.5 × costo;
    - sin llave se usa el respaldo; con un Gemini simulado, la respuesta válida se acepta **con cifras recalculadas**, se rechaza un platillo inventado y se rechaza un descuento no rentable;
    - la alerta con ventas lentas genera ficha (ventana 16:00–18:00, con recomendaciones de inocuidad) y se puede "enviar"; a las 17:45 ya no hay ventana viable; con `generar_ficha: false` solo proyecta sin registrar; sin sobrante no hay ficha; y responde 422/400/404 a errores;
-   - la auditoría tiene 7 días, no hay fuga de datos y los totales cuadran;
    - la predicción acepta festivo, evento en la plaza y época, y rechaza una época inexistente;
    - el historial de compras por mes y por día: totales consistentes, días sin predicción, 404 y 422.
 
@@ -395,7 +365,7 @@ curl -X POST localhost:8000/api/predecir -H "Content-Type: application/json" \
 curl "localhost:8000/api/inventario?estado=CRITICO"
 curl -X POST localhost:8000/api/optimizar-menu -H "Content-Type: application/json" -d '{}'
 curl -X POST localhost:8000/api/alerta-excedente -H "Content-Type: application/json" -d '{"hora_actual":"15:00","ritmo_ventas":"lento"}'
-curl "localhost:8000/api/auditoria?dias=7&insumo=pollo"
+curl "localhost:8000/api/historial-compras?agrupar=mes&insumo=todos"
 ```
 
 ## 8. Preguntas probables de los jueces
@@ -406,8 +376,8 @@ El backend lo rechaza y usa las reglas locales; la respuesta dice `modo: fallbac
 **¿Cómo se comunica todo?**
 El navegador solo habla con la API por JSON. La API lee SQLite para inventario, recetas e historial, carga el `.pkl` una vez por proceso para predecir, y llama a Gemini solo para elegir y redactar promociones y fichas. Las cuentas siempre las hace Python.
 
-**¿Por qué la auditoría no usa el modelo ya entrenado?**
-Porque ese modelo ya vio esos días y el resultado saldría inflado. Se reentrena sin ellos, como si estuviéramos en el pasado.
+**¿Por qué el historial no usa el modelo ya entrenado para todos los días?**
+Porque ese modelo ya vio esos días y el resultado saldría inflado. Cada bloque de 30 días se predice con un modelo entrenado solo con los días anteriores, como si estuviéramos en el pasado.
 
 **¿El aviso al comedor se envía de verdad?**
 No. En el prototipo el envío es SIMULADO y solo queda registrado. Integrar WhatsApp o correo sería el siguiente paso.

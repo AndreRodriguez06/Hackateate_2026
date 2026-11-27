@@ -12,7 +12,7 @@ Tener datos históricos suficientes y coherentes para:
 - entrenar el modelo de demanda (Apartado 3),
 - alimentar los endpoints del backend (Apartado 4),
 - darle a Gemini un inventario con caducidades críticas y un recetario real del menú (Apartado 6),
-- calcular el backtesting de la vista de auditoría.
+- calcular el historial de compras contra la sugerencia del modelo (Vista 4).
 
 ## 2. Medios utilizados
 
@@ -83,8 +83,8 @@ erDiagram
 | `platillos` | uno de los 30 platillos del menú vigente | `precio_venta_mxn`, `popularidad_base` | Gemini, alertas |
 | `recetas` | cantidad de un insumo en una porción | `cantidad_por_porcion` | Consumo, costo por porción, Gemini |
 | `contexto_diario` | un día de operación | `dia_semana`, `es_quincena`, `es_dia_festivo`, `nombre_festivo`, `epoca_anio`, `lluvia`, `temperatura_c`, `evento_cercano`, `evento_plaza`, `comensales` | Variables del modelo ML |
-| `ventas_diarias` | porciones vendidas de un platillo en un día | `porciones_vendidas`, `ingreso_mxn` | Alertas, auditoría |
-| `consumo_insumos_diario` | uso real de un insumo en un día vs. compra tradicional | `consumo_real` (**objetivo del ML**), `compra_tradicional`, `merma_tradicional`, `faltante_tradicional` | Modelo, backtesting |
+| `ventas_diarias` | porciones vendidas de un platillo en un día | `porciones_vendidas`, `ingreso_mxn` | Alertas |
+| `consumo_insumos_diario` | uso real de un insumo en un día vs. compra tradicional | `consumo_real` (**objetivo del ML**), `compra_tradicional`, `merma_tradicional`, `faltante_tradicional` | Modelo, historial de compras |
 | `inventario_lotes` | un lote en almacén | `cantidad`, `fecha_caducidad` | Vista 2, Gemini |
 | `promociones_generadas` | una promoción que propuso el sistema | `modo` (`gemini`/`fallback`), `respuesta_json` | Bitácora (Apartado 6) |
 | `alertas_excedente` | una ficha de rescate generada | `porciones_excedentes`, `ventana_inicio`, `ficha_json` | Bitácora (Apartado 6) |
@@ -313,7 +313,7 @@ python -c "import sqlite3; c=sqlite3.connect('data/restaurante.db'); print(c.exe
 | **Excel o Google Sheets** | `python scripts/exportar_csv.py` crea `data/csv/` con un CSV por tabla, más `compras_diarias.csv` y `ventas_detalle.csv` con nombres legibles | Revisar y filtrar sin programar |
 | **DB Browser for SQLite** (gratis, sqlitebrowser.org) | Abrir `data/restaurante.db` → pestaña "Browse Data" | Explorar tablas y hacer consultas |
 | **VS Code** | Extensión "SQLite Viewer" y abrir `data/restaurante.db` | Si ya usan VS Code |
-| **La aplicación** | Vista 5 · Historial de Compras: compras día a día, por semana o por mes | Ver compras contra consumo y ahorro |
+| **La aplicación** | Vista 4 · Historial de Compras: compras día a día, por semana o por mes | Ver compras contra consumo y ahorro |
 | **Terminal** | `sqlite3 data/restaurante.db "SELECT * FROM contexto_diario LIMIT 10;"` | Consultas rápidas |
 
 ## 8.2 ¿Siempre se simulan los mismos datos?

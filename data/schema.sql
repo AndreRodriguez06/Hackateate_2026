@@ -1,5 +1,5 @@
 -- =============================================================================
--- ZeroMerma AI — Esquema de base de datos (SQLite)
+-- Opsia — Esquema de base de datos (SQLite)
 -- Archivo: /data/schema.sql
 --
 -- Regla de la rúbrica: TODO registro ficticio se marca con origen_dato = 'SIMULADO'.
