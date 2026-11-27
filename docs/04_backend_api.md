@@ -1,9 +1,11 @@
 # 04 · Backend y API REST (FastAPI)
 
 > **Apartado 4 · Orden 2.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_api.py`, 19 pruebas). Total del repositorio: 65 pruebas.
+> Estado: ✅ implementado y probado (`tests/test_api.py`, 19 pruebas). Total del repositorio: 66 pruebas.
 
 > ⚠️ **Todas las respuestas provienen de datos SIMULADOS.** Cada respuesta incluye `es_simulado: true`, y los lotes del inventario lo indican uno por uno.
+
+> El inventario es SIMULADO al azar por semilla y día: los ejemplos de este documento son de una corrida concreta y los insumos críticos cambian de un día a otro.
 
 ## 1. Objetivo
 
@@ -287,7 +289,7 @@ Error: **404** si la alerta no existe.
 
 ### 4.8 `GET /api/historial-compras` · Vista 4
 
-Lo que se compró **cada día** según la base de datos (compra tradicional), lo que se consumió y lo que habría sugerido Opsia, para **todo el historial**.
+Lo que se compró **cada día** según la base de datos (compra tradicional), lo que se consumió y lo que habría sugerido OpsIA, para **todo el historial**.
 
 | Parámetro (query) | Tipo | Por defecto | Descripción |
 |---|---|---|---|
@@ -347,7 +349,7 @@ Errores: **404** insumo inexistente · **422** agrupación inválida · **503** 
 
 1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 8 endpoints.
 2. En `/docs`, probar `POST /api/predecir` con margen `0.02`: `riesgo_desabasto: true`.
-3. `python -m unittest discover -s tests -v`: 65 pruebas. Las 19 de la API comprueban:
+3. `python -m unittest discover -s tests -v`: 66 pruebas. Las 19 de la API comprueban:
    - el arranque genera datos y modelo;
    - el inventario está ordenado y con el semáforo correcto, y el filtro por estado funciona;
    - la predicción cumple la fórmula, alerta el desabasto y responde 422/400 a entradas inválidas;

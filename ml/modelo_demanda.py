@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Opsia — Modelo predictivo de demanda (Random Forest)
+OpsIA — Modelo predictivo de demanda (Random Forest)
 Archivo: /ml/modelo_demanda.py
 
 Qué hace
@@ -303,7 +303,7 @@ def validar(datos: dict, margen_referencia: float = 0.08) -> dict:
 
 def predicciones_historicas(datos: dict, margenes: np.ndarray) -> dict:
     """
-    Compra que habría sugerido Opsia para CADA día del historial, sin ver ese día:
+    Compra que habría sugerido OpsIA para CADA día del historial, sin ver ese día:
     ventana creciente, se reentrena cada 30 días con todo lo anterior (primeros 60 días: sin dato).
     compra_sugerida = predicción × (1 + margen recomendado del insumo).
     """
@@ -493,7 +493,7 @@ def predecir_compra(insumo: str, dia_semana: int, es_quincena: bool, lluvia: boo
 # =============================================================================
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Modelo de demanda de Opsia (datos SIMULADOS).")
+    p = argparse.ArgumentParser(description="Modelo de demanda de OpsIA (datos SIMULADOS).")
     sub = p.add_subparsers(dest="comando", required=True)
 
     e = sub.add_parser("entrenar", help="Valida, entrena y guarda ml/modelo_rf.pkl")

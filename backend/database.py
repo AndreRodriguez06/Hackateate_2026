@@ -1,5 +1,5 @@
 """
-Opsia — Acceso a la base de datos SQLite
+OpsIA — Acceso a la base de datos SQLite
 Archivo: /backend/database.py
 
 Funciones de consulta que comparten los endpoints. No contiene lógica HTTP.

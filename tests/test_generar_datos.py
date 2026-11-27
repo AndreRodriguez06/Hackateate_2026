@@ -9,7 +9,7 @@ import sqlite3
 from contextlib import closing
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -49,10 +49,25 @@ class TestGenerarDatos(unittest.TestCase):
             self.con.execute("INSERT INTO platillos (clave, nombre, categoria, precio_venta_mxn,"
                              " popularidad_base, origen_dato) VALUES ('x','x','x',10,0,'INVENTADO')")
 
-    def test_hay_insumos_criticos_a_menos_de_24h(self):
-        n = self.contar("SELECT COUNT(*) FROM inventario_lotes WHERE "
+    def test_hay_de_3_a_5_insumos_criticos(self):
+        n = self.contar("SELECT COUNT(DISTINCT insumo_id) FROM inventario_lotes WHERE "
                         "(julianday(fecha_caducidad) - julianday('now','localtime')) * 24 < 24")
-        self.assertGreaterEqual(n, 2)
+        self.assertTrue(3 <= n <= 5, n)
+        self.assertEqual(self.contar("SELECT COUNT(DISTINCT insumo_id) FROM inventario_lotes"), 46)  # todos tienen lote
+
+    def test_inventario_cambia_con_la_semilla_y_el_dia(self):
+        ids = dict(self.con.execute("SELECT clave, id FROM insumos"))
+        hoy = datetime(2026, 11, 27, 9, 0)
+        def criticos(semilla, momento):
+            return generar_datos.generar_inventario(self.con, ids, momento, semilla)
+        self.assertEqual(criticos(42, hoy), criticos(42, hoy))                      # misma semilla y día: igual
+        dias = {tuple(criticos(42, hoy + timedelta(days=d))) for d in range(10)}
+        semillas = {tuple(criticos(s, hoy)) for s in range(10)}
+        self.assertGreater(len(dias), 5)                                             # cambia de un día a otro
+        self.assertGreater(len(semillas), 5)                                         # y de una semilla a otra
+        for c in dias | semillas:
+            self.assertTrue(set(c) <= set(generar_datos.insumos_candidatos_a_critico()))
+        self.con.rollback()                                                          # no altera la base de la prueba
 
     def test_menu_de_30_platillos_con_catalogo_consistente(self):
         self.assertEqual(self.contar("SELECT COUNT(*) FROM platillos"), 30)

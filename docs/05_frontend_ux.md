@@ -122,7 +122,7 @@ Reglas de la capa de conexión (`api()` y `conRespaldo()` en `app.js`):
 - **Controles:** agrupar por día, semana o mes; producto (todos, en $MXN, o uno de los 46, en su unidad).
 - **4 KPIs** sobre los días comparables:
   - compra tradicional;
-  - compra con Opsia y su demanda no cubierta;
+  - compra con OpsIA y su demanda no cubierta;
   - **cuánto se habría ahorrado** en compras;
   - merma evitada en $MXN y kg.
 - **Gráfica** con barras de compra tradicional y sugerida y línea de consumo real, con **zoom** (`chartjs-plugin-zoom`): rueda del ratón o pellizco para acercar, arrastrar para moverse, y botones Acercar, Alejar y Ver todo. Sin zoom se ven todas las barras delgadas; al acercar quedan menos barras y más anchas. Un texto indica qué rango se está viendo.
@@ -192,12 +192,12 @@ Preparación (antes de entrar):
 
 | Min | Vista | Qué hacer | Qué decir |
 |---|---|---|---|
-| 0:00–0:45 | Barra superior | Señalar el distintivo ámbar y "API conectada". | "Un restaurante de plaza compra perecederos a ojo: o tira comida o se queda sin platillos. Opsia decide en 4 momentos del día. Todo lo que verán son datos SIMULADOS y lo marcamos siempre." |
+| 0:00–0:45 | Barra superior | Señalar el distintivo ámbar y "API conectada". | "Un restaurante de plaza compra perecederos a ojo: o tira comida o se queda sin platillos. OpsIA decide en 4 momentos del día. Todo lo que verán son datos SIMULADOS y lo marcamos siempre." |
 | 0:45–2:30 | 1 · Planeador | Pechuga de pollo, martes (113 clientes). Cambiar el escenario a **Viernes de Quincena + Lluvia** (194). Después: sábado, temporada navideña, festivo y evento en la plaza (260). | "El Random Forest predice el consumo de 46 insumos con el día, la quincena, la lluvia, los eventos, los días festivos y la época del año. Compra sugerida = demanda × (1 + margen)." |
 | | | Bajar el margen a **2 %**: aparece el banner rojo. Pulsar **Usar** el margen recomendado. | "Si el encargado recorta demasiado, avisamos del desabasto. El margen recomendado sale de los errores reales del modelo en días que no había visto: cubre 9 de cada 10 días." |
 | | | Señalar la gráfica de importancia. | "El día de la semana fija la base; la época del año, la lluvia, la quincena, los eventos y los festivos explican cuánto se aleja un día de lo normal." |
-| 2:30–4:15 | 2 · Rescate | Mostrar los 4 críticos (pollo, bolillo, crema, carne molida). Pulsar **✨ Optimizar Menú**. | "Cruzamos lo que caduca en 24 h con el recetario. Solo proponemos platillos que ya existen y nunca por debajo de 1.5 × su costo." |
-| | | Señalar el distintivo de modo y una tarjeta: pérdida contra margen. | "Si se tira, se pierden $487 en insumos de enchiladas; con la promoción recuperamos $671. Gemini redacta el texto, pero las cuentas las hace y valida nuestro backend." |
+| 2:30–4:15 | 2 · Rescate | Mostrar los insumos críticos del día (son de 3 a 5 y cambian cada día). Pulsar **✨ Optimizar Menú**. | "Cruzamos lo que caduca en 24 h con el recetario. Solo proponemos platillos que ya existen y nunca por debajo de 1.5 × su costo." |
+| | | Señalar el distintivo de modo y una tarjeta: pérdida contra margen. | "Señalar una tarjeta: si se tira, se pierde esto en insumos; con la promoción recuperamos este margen (las cifras cambian con el inventario del día). Gemini redacta el texto, pero las cuentas las hace y valida nuestro backend." |
 | | | Señalar el menú QR. | "Así lo ve el comensal." |
 | 4:15–5:45 | 3 · Alerta | Ritmo **Ventas Lentas**, hora 3:00 PM: alerta naranja. | "A media jornada proyectamos el cierre. Hoy sobrarán 4 porciones." |
 | | | **Generar Ficha** → **Enviar aviso**. | "La ficha da una ventana de 4:00 a 6:00 PM, que termina 2 h antes del cierre para que el comedor alcance a repartir, y las recomendaciones de inocuidad. El envío en el prototipo es simulado; el siguiente paso es WhatsApp." |

@@ -1,5 +1,5 @@
 """
-Opsia — Rescate rentable en menú
+OpsIA — Rescate rentable en menú
 Archivo: /backend/services/rescate_menu.py
 
 Cruza los insumos a punto de caducar con el recetario y propone promociones

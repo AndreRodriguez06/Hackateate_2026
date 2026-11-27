@@ -1,11 +1,11 @@
 """
-Opsia — Historial de compras (vista 5)
+OpsIA — Historial de compras (vista 5)
 Archivo: /backend/services/historial_compras.py
 
 Muestra, para todo el historial guardado en la base de datos:
   * lo que se compró cada día con el método tradicional ("a ojo"),
   * lo que realmente se consumió,
-  * lo que habría sugerido Opsia, predicho SIN ver ese día
+  * lo que habría sugerido OpsIA, predicho SIN ver ese día
     (modelo con ventana creciente, ver ml/modelo_demanda.py: predicciones_historicas),
 agrupado por día, semana o mes, para un insumo o para todos (en $MXN, porque kg, L y
 piezas no se pueden sumar entre sí).

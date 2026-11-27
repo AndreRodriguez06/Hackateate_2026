@@ -1,7 +1,7 @@
 # 02 · Base de datos SQLite y datos históricos simulados
 
 > **Apartado 2 · Orden 1.2** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_generar_datos.py`, 12 pruebas).
+> Estado: ✅ implementado y probado (`tests/test_generar_datos.py`, 13 pruebas).
 
 > ⚠️ **Todos los registros de esta base de datos son SIMULADOS.** Representan un restaurante hipotético de plaza comercial y no corresponden a ningún negocio real. Cada tabla tiene la columna `origen_dato` y la base rechaza cualquier registro que no diga `SIMULADO` o `REAL`.
 
@@ -29,7 +29,7 @@ Desde la raíz del repositorio:
 
 ```bash
 python data/generar_datos.py                    # crea data/restaurante.db (365 días, semilla 42)
-python data/generar_datos.py --solo-inventario  # justo antes de la demo: refresca las caducidades
+python data/generar_datos.py --solo-inventario  # genera un inventario nuevo (otros críticos si cambió el día)
 python scripts/exportar_csv.py                  # exporta todas las tablas a data/csv/ para Excel
 python -m unittest discover -s tests -v         # corre las pruebas
 ```
@@ -52,11 +52,10 @@ Registros por tabla (todos SIMULADOS):
 Historial: 2025-11-26 a 2026-11-25 | comensales promedio/día: 159 | días con lluvia: 32% | días de quincena: 13%
 Días festivos: 12 | días con evento en la plaza: 27 | épocas: cuesta de enero 46 d, temporada navideña 31 d, regular 226 d, verano 62 d
 
-Inventario a menos de 24 h de caducar:
-  - Pechuga de pollo: 7.5 kg (caduca en 18.0 h)
-  - Pan bolillo: 40.0 pza (caduca en 20.0 h)
-  - Crema ácida: 4.0 L (caduca en 22.0 h)
-  - Carne molida de res: 3.0 kg (caduca en 23.0 h)
+Inventario a menos de 24 h de caducar:          (cambia con la semilla y el día)
+  - Chile serrano: 0.5 kg (caduca en 8.0 h)
+  - Tomate verde: 2.5 kg (caduca en 9.9 h)
+  - Piña: 0.5 kg (caduca en 16.9 h)
 
 Verificación OK: todos los registros están etiquetados como SIMULADO.
 ```
@@ -161,7 +160,7 @@ El menú tiene **24 platillos principales** (16 platos fuertes, 5 desayunos y 3 
 | 29 | Jugo de Naranja (400 ml) | $40 | Naranja para jugo 450 g | $9.90 | 25% |
 | 30 | Licuado de Plátano (400 ml) | $45 | Leche entera 250 ml, Plátano tabasco 120 g, Azúcar estándar 20 g | $10.24 | 23% |
 
-Para agregar o cambiar un platillo: edita `PLATILLOS` y `RECETAS` en `data/generar_datos.py` (y `INSUMOS` y `LOTES_INVENTARIO` si usa un insumo nuevo), corre el script y las pruebas. Si la popularidad de los principales deja de sumar 1.0, el script lo avisa.
+Para agregar o cambiar un platillo: edita `PLATILLOS` y `RECETAS` en `data/generar_datos.py` (y `INSUMOS` si usa un insumo nuevo; su lote de inventario se genera solo), corre el script y las pruebas. Si la popularidad de los principales deja de sumar 1.0, el script lo avisa.
 
 ## 5. Cómo se generan los datos (supuestos SIMULADOS)
 
@@ -238,18 +237,18 @@ El sobrante que **caduca** depende de la vida útil del insumo:
 | ≤ 14 días (queso manchego, cebolla, naranja, limón, papa, zanahoria) | 10 % |
 | más de 14 días (huevo, mantequilla y abarrotes) | 0 % |
 
-### 5.5 Inventario actual
+### 5.5 Inventario actual (aleatorio)
 
-47 lotes (al menos uno por insumo) con caducidad **relativa a la hora en que se corre el script**. Así la demo siempre tiene insumos críticos sin importar el día. Los cuatro primeros coinciden con el prototipo:
+El inventario se **simula al azar** cada vez que se genera, con una semilla que combina la **semilla del dataset y la fecha del día** (`generar_inventario()`):
 
-| Insumo | Cantidad | Caduca en | Semáforo |
-|---|---|---|---|
-| Pechuga de pollo | 7.5 kg | 18 h | 🔴 |
-| Crema ácida | 4.0 L | 22 h | 🔴 |
-| Jitomate saladet | 6.0 kg | 48 h | 🟡 |
-| Arroz blanco | 12.0 kg | 15 días | 🟢 |
-| Pan bolillo | 40 pza | 20 h | 🔴 |
-| Carne molida de res | 3.0 kg | 23 h | 🔴 |
+- **Mismo día y misma semilla → mismo inventario**, para que una demo se pueda repetir. **Otro día u otra semilla → otros insumos críticos.**
+- Siempre hay **entre 3 y 5 insumos críticos**, con 8 a 23 h para caducar. Se eligen entre los perecederos de vida corta (≤ 14 días): proteínas, lácteos, panes, verduras y frutas.
+- La elección es al azar, pero **ponderada por el valor consumido al día** (raíz de consumo × precio): pollo, queso, carne molida o tortilla salen más seguido que el rábano o el chile serrano. En 60 días simulados aparecieron 32 insumos distintos.
+- **Todos los insumos tienen un lote.** Las cantidades salen del consumo promedio real de las últimas 4 semanas del historial: de 0.4 a 1.2 días de consumo en los críticos, de 1 a 2.5 días en los demás perecederos y de 4 a 12 días en abarrotes. Algunos críticos tienen además un lote fresco recién recibido.
+- Las caducidades son **relativas a la hora en que se corre el script**.
+- **Al arrancar, el servidor genera el inventario del día** si el que hay es de otro día (o ya no tiene críticos vigentes). Por eso cada día se ven otros productos por caducar.
+
+Ejemplo (semilla 42, 2026-11-27): chile serrano 0.5 kg (8 h), tomate verde 2.5 kg (10 h) y piña 0.5 kg (17 h). Al día siguiente: bolillo, limón, milanesa y naranja.
 
 El semáforo **no se guarda**: el backend lo calcula al consultar, porque cambia con cada hora que pasa.
 
@@ -264,6 +263,7 @@ El semáforo **no se guarda**: el backend lo calcula al consultar, porque cambia
 | Semilla fija | Datos aleatorios en cada ejecución | Todo el equipo ve los mismos números y el modelo es reproducible. |
 | 365 días por defecto | 180 días | Para que el historial cubra diciembre, enero y verano y el modelo aprenda las épocas del año. |
 | Caducidades relativas a "ahora" | Fechas fijas | En la demo siempre hay insumos a menos de 24 h. |
+| Inventario al azar por semilla y día | Lista fija de lotes | La demo muestra productos distintos cada día, pero se puede repetir el mismo día. |
 | Simular el consumo desde ventas × recetas | Simular el consumo directamente | El consumo queda coherente con lo vendido y con el recetario que usa Gemini. |
 | `restaurante.db` fuera de git | Subir el archivo | Se regenera en 1 segundo y evita conflictos de merge. |
 
@@ -287,13 +287,14 @@ Para cada insumo, consultar en PROFECO *Quién es Quién en los Precios* y actua
 ## 8. Cómo verificar que funciona
 
 1. `python data/generar_datos.py` termina con `Verificación OK`.
-2. `python -m unittest discover -s tests -v` muestra 10 pruebas `ok`. Comprueban:
+2. `python -m unittest discover -s tests -v` muestra 13 pruebas `ok`. Comprueban:
    - 365 días de historial por defecto;
    - las columnas nuevas existen (festivo, época, evento en la plaza), no existe "vacaciones" y aparecen las 4 épocas;
    - fechas de festivos (16 de septiembre, Viernes Santo, tercer lunes de noviembre), épocas y Buen Fin;
    - todas las tablas etiquetadas `SIMULADO`;
    - la base rechaza un registro con otra etiqueta;
-   - hay al menos 2 lotes a menos de 24 h de caducar;
+   - hay de 3 a 5 insumos críticos y todos los insumos tienen lote;
+   - el inventario cambia con la semilla y con el día, y se repite igual con la misma semilla el mismo día;
    - el menú tiene 30 platillos y el catálogo es consistente (recetas, insumos, lotes, popularidades);
    - cada platillo tiene receta;
    - el consumo cuadra con ventas × recetas;

@@ -1,5 +1,5 @@
 /* =============================================================================
-   Opsia — Frontend (Vanilla JS)
+   OpsIA — Frontend (Vanilla JS)
    Archivo: /frontend/app.js
 
    Resiliencia dual:
@@ -931,7 +931,7 @@
         labels: r.serie.map((f) => f.etiqueta),
         datasets: [
           { type: 'bar', label: 'Compra Tradicional (registrada)', data: datos('compra_tradicional'), backgroundColor: COLORES.slate300, borderRadius: 3, order: 3 },
-          { type: 'bar', label: 'Compra Sugerida por Opsia', data: datos('compra_sugerida'), backgroundColor: COLORES.emerald600, borderRadius: 3, order: 2 },
+          { type: 'bar', label: 'Compra Sugerida por OpsIA', data: datos('compra_sugerida'), backgroundColor: COLORES.emerald600, borderRadius: 3, order: 2 },
           { type: 'line', label: 'Consumo Real', data: datos('consumo_real'), borderColor: COLORES.slate900, backgroundColor: COLORES.slate900,
             borderWidth: 2, pointRadius: r.serie.length > 60 ? 0 : 3, tension: 0.25, order: 1 },
         ],

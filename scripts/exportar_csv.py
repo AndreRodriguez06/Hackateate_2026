@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Opsia — Exporta la base de datos SIMULADA a archivos CSV (para Excel o Google Sheets)
+OpsIA — Exporta la base de datos SIMULADA a archivos CSV (para Excel o Google Sheets)
 Archivo: /scripts/exportar_csv.py
 
 Crea data/csv/ con un archivo por tabla, más dos vistas "legibles" que unen nombres:
@@ -41,7 +41,7 @@ VISTAS = {
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Exporta la base SIMULADA de Opsia a CSV.")
+    p = argparse.ArgumentParser(description="Exporta la base SIMULADA de OpsIA a CSV.")
     p.add_argument("--db", type=Path, default=RAIZ / "data" / "restaurante.db")
     p.add_argument("--salida", type=Path, default=RAIZ / "data" / "csv")
     args = p.parse_args(argv)

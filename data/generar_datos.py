@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Opsia — Generador de datos históricos SIMULADOS
+OpsIA — Generador de datos históricos SIMULADOS
 Archivo: /data/generar_datos.py
 
 Crea la base de datos SQLite `data/restaurante.db` a partir de `data/schema.sql`
@@ -12,8 +12,9 @@ comercial en México:
     época del año, eventos cercanos y eventos en la plaza
   * ventas diarias por platillo
   * consumo diario por insumo vs. compra tradicional "a ojo" (merma y faltantes)
-  * inventario actual por lotes, con caducidades relativas a la hora de ejecución
-    (siempre hay insumos a menos de 24 h de caducar para la demo)
+  * inventario actual por lotes, simulado al azar según la semilla y el día, con
+    caducidades relativas a la hora de ejecución (siempre hay de 3 a 5 insumos a
+    menos de 24 h de caducar para la demo)
 
 TODOS los registros llevan origen_dato = 'SIMULADO' (regla de la rúbrica).
 
@@ -23,7 +24,7 @@ Uso:
     python data/generar_datos.py                    # 365 días, semilla 42
     python data/generar_datos.py --semilla 7        # otro restaurante simulado (datos distintos)
     python data/generar_datos.py --dias 730         # más historial
-    python data/generar_datos.py --solo-inventario  # solo refresca caducidades antes de la demo
+    python data/generar_datos.py --solo-inventario  # nuevo inventario (otros críticos si cambió el día)
     python data/generar_datos.py --help
 """
 
@@ -547,72 +548,78 @@ def generar_historial(con: sqlite3.Connection, ids_insumo: dict, ids_platillo: d
             historial_consumo[insumo].append(real)
 
 
-# Inventario actual: (insumo, cantidad, horas desde ingreso, horas para caducar).
-# Hay al menos un lote de cada insumo. Los cuatro primeros coinciden con la vista
-# "Rescate Rentable" del prototipo.
-LOTES_INVENTARIO = [
-    ("pollo",            7.5,  54,   18),   # CRÍTICO (< 24 h)
-    ("crema",            4.0, 146,   22),   # CRÍTICO (< 24 h)
-    ("jitomate",         6.0,  72,   48),   # vigilar (< 72 h)
-    ("arroz",           12.0, 240,  360),   # estable (15 días)
-    ("bolillo",         40.0,   4,   20),   # CRÍTICO (< 24 h)
-    ("carne_molida",     3.0,  25,   23),   # CRÍTICO (< 24 h)
-    ("pollo",           10.0,   6,   66),
-    ("milanesa",         4.0,  12,   60),
-    ("bistec",           5.0,  10,   62),
-    ("cerdo",            6.0,  20,   52),
-    ("jamon",            1.5,  72,   96),
-    ("tocino",           1.0,  48,  120),
-    ("huevo",            6.0, 120,  384),
-    ("queso",            3.2, 192,  144),
-    ("queso_fresco",     2.0,  72,   96),
-    ("leche",            8.0,  48,  120),
-    ("mantequilla",      1.0, 240,  480),
-    ("tortilla",         5.0,  10,   30),
-    ("masa",             4.0,   8,   30),   # vigilar
-    ("pan_hamburguesa", 24.0,  24,   72),
-    ("pan_caja",         2.0,  24,   96),
-    ("tomate_verde",     4.0,  48,  120),
-    ("cebolla",          5.0,  96,  144),
-    ("lechuga",          2.5,  36,   60),
-    ("chile_serrano",    0.5,  48,  120),
-    ("cilantro",         0.4,  30,   66),
-    ("rabano",           0.6,  24,   96),
-    ("papa",            15.0,  72,  264),
-    ("zanahoria",        3.0,  72,  264),
-    ("calabacita",       2.5,  48,   96),
-    ("maiz_pozolero",    4.0,  48,   72),
-    ("aguacate",         3.0,  56,   40),
-    ("fruta",            5.0,  60,   36),
-    ("pina",             3.0,  48,   72),
-    ("platano",          3.0,  48,   72),
-    ("naranja",         20.0,  48,  192),
-    ("limon",            4.0,  72,  168),
-    ("frijol",           8.0, 480, 4800),
-    ("cafe",             2.0, 360, 1800),
-    ("aceite",          10.0, 240, 3600),
-    ("harina",           5.0, 240, 3600),
-    ("azucar",           8.0, 240, 6000),
-    ("pan_molido",       1.5, 240, 1200),
-    ("chile_seco",       0.5, 480, 3000),
-    ("chipotle",         1.0, 480, 3000),
-    ("mole",             2.0, 480, 1500),
-    ("leche_condensada", 2.0, 480, 3000),
-]
+# Inventario actual SIMULADO al azar.
+# Cambia según la semilla del dataset y el día en que se genera (con la misma semilla,
+# el mismo día da el mismo inventario). Siempre hay entre 3 y 5 insumos críticos.
+CRITICOS_MIN, CRITICOS_MAX = 3, 5
+HORAS_CRITICO = (8.0, 23.0)          # los críticos caducan en menos de 24 h
+DIAS_DE_EXISTENCIA = {               # cuántos días de consumo hay en almacén
+    "critico": (0.4, 1.2),
+    "perecedero": (1.0, 2.5),
+    "abarrote": (4.0, 12.0),
+}
 
 
-def generar_inventario(con: sqlite3.Connection, ids_insumo: dict, ahora: datetime) -> None:
-    ubicacion = {i[0]: i[7] for i in INSUMOS}
+def insumos_candidatos_a_critico() -> list[str]:
+    """Perecederos de vida corta (≤ 14 días): los que realmente se echan a perder."""
+    return sorted(i[0] for i in INSUMOS if i[6] == 1 and i[5] <= 14)
+
+
+def generar_inventario(con: sqlite3.Connection, ids_insumo: dict, ahora: datetime, semilla: int | str) -> list[str]:
+    """
+    Crea los lotes del almacén. Devuelve las claves de los insumos críticos elegidos.
+    Las cantidades salen del consumo promedio real de las últimas 4 semanas del historial.
+    """
+    rng = random.Random(f"{semilla}-{ahora.date().isoformat()}")
+    info = {i[0]: i for i in INSUMOS}
+    consumo = dict(con.execute("""
+        SELECT i.clave, AVG(c.consumo_real) FROM consumo_insumos_diario c JOIN insumos i ON i.id = c.insumo_id
+        WHERE c.fecha > date((SELECT MAX(fecha) FROM consumo_insumos_diario), '-28 days')
+        GROUP BY i.clave"""))
+    # Sorteo sin reemplazo, ponderado por la raíz del valor consumido al día ($): los insumos
+    # que más se mueven (proteínas, lácteos, tortilla) salen más seguido, pero cualquiera puede salir.
+    candidatos = insumos_candidatos_a_critico()
+    pesos = {c: max((consumo.get(c) or 0.0) * info[c][4], 1.0) ** 0.5 for c in candidatos}
+    criticos = []
+    for _ in range(rng.randint(CRITICOS_MIN, min(CRITICOS_MAX, len(candidatos)))):
+        restantes = [c for c in candidatos if c not in criticos]
+        criticos.append(rng.choices(restantes, weights=[pesos[c] for c in restantes])[0])
+    criticos.sort()
+
+    def cantidad(clave: str, tipo: str) -> float:
+        _c, _n, _cat, unidad, _p, _v, _per, _u = info[clave]
+        diario = consumo.get(clave) or 0.5
+        valor = redondear_a_empaque(diario * rng.uniform(*DIAS_DE_EXISTENCIA[tipo]), unidad)
+        return max(valor, 1.0 if unidad == "pza" else 0.5)
+
+    lotes = []  # (insumo, cantidad, horas desde ingreso, horas para caducar)
+    for clave, (_c, _n, _cat, _unidad, _p, vida, perecedero, _u) in info.items():
+        horas_vida = vida * 24
+        if clave in criticos:
+            horas = rng.uniform(*HORAS_CRITICO)
+            tipo = "critico"
+        elif perecedero and vida <= 14:
+            horas = rng.uniform(26.0, max(horas_vida, 30.0))   # vigente: más de un día de vida
+            tipo = "perecedero"
+        else:
+            horas = rng.uniform(min(15 * 24, horas_vida * 0.5), horas_vida)
+            tipo = "abarrote"
+        lotes.append((clave, cantidad(clave, tipo), max(1.0, horas_vida - horas), horas))
+        # Algunos críticos tienen además un lote fresco recién recibido (como pasa en un almacén real).
+        if clave in criticos and rng.random() < 0.5:
+            lotes.append((clave, cantidad(clave, "perecedero"), rng.uniform(2.0, 12.0),
+                          rng.uniform(max(horas_vida * 0.6, 26.0), max(horas_vida, 30.0))))
+
     con.execute("DELETE FROM inventario_lotes")
-    for n, (insumo, cantidad, horas_ingreso, horas_caducar) in enumerate(LOTES_INVENTARIO, start=1):
+    for n, (insumo, cant, horas_ingreso, horas_caducar) in enumerate(lotes, start=1):
         ingreso = (ahora - timedelta(hours=horas_ingreso)).replace(microsecond=0)
         caducidad = (ahora + timedelta(hours=horas_caducar)).replace(microsecond=0)
         con.execute(
             "INSERT INTO inventario_lotes (id, insumo_id, cantidad, fecha_ingreso, fecha_caducidad,"
             " ubicacion, origen_dato) VALUES (?,?,?,?,?,?,?)",
-            (n, ids_insumo[insumo], cantidad, ingreso.isoformat(), caducidad.isoformat(),
-             ubicacion[insumo], ORIGEN),
+            (n, ids_insumo[insumo], cant, ingreso.isoformat(), caducidad.isoformat(), info[insumo][7], ORIGEN),
         )
+    return criticos
 
 
 def guardar_metadatos(con: sqlite3.Connection, args: argparse.Namespace, fecha_fin: date, ahora: datetime) -> None:
@@ -622,6 +629,7 @@ def guardar_metadatos(con: sqlite3.Connection, args: argparse.Namespace, fecha_f
                        "No representan operaciones de ningún restaurante real.",
         "version_script": VERSION_SCRIPT,
         "generado_en": ahora.replace(microsecond=0).isoformat(),
+        "inventario_actualizado_en": ahora.replace(microsecond=0).isoformat(),
         "semilla": str(args.semilla),
         "dias_historial": str(args.dias),
         "fecha_inicio": (fecha_fin - timedelta(days=args.dias - 1)).isoformat(),
@@ -652,8 +660,6 @@ def verificar_catalogo() -> list[str]:
         errores.append(f"recetas con insumos que no existen: {usados - claves_insumo}")
     if claves_insumo - usados:
         errores.append(f"insumos que ninguna receta usa: {claves_insumo - usados}")
-    if claves_insumo - {lote[0] for lote in LOTES_INVENTARIO}:
-        errores.append(f"insumos sin lote en inventario: {claves_insumo - {lote[0] for lote in LOTES_INVENTARIO}}")
     suma = sum(p[4] for p in PLATILLOS if p[2] in CATEGORIAS_PRINCIPALES)
     if abs(suma - 1.0) > 1e-9:
         errores.append(f"la popularidad de los platillos principales suma {suma:.3f}, debe sumar 1.0")
@@ -722,7 +728,7 @@ def imprimir_resumen(con: sqlite3.Connection, ruta_db: Path) -> None:
 # =============================================================================
 
 def parsear_argumentos(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Genera la base de datos SIMULADA de Opsia.")
+    p = argparse.ArgumentParser(description="Genera la base de datos SIMULADA de OpsIA.")
     p.add_argument("--db", type=Path, default=RUTA_DB_DEFAULT, help="Ruta del archivo SQLite a crear.")
     p.add_argument("--dias", type=int, default=365, help="Días de historial (mínimo 150; 365 o más para cubrir todas las épocas del año).")
     p.add_argument("--semilla", type=int, default=42, help="Semilla aleatoria (misma semilla = mismos datos).")
@@ -754,12 +760,13 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         con = sqlite3.connect(args.db)
         ids_insumo = dict(con.execute("SELECT clave, id FROM insumos"))
-        faltantes = {lote[0] for lote in LOTES_INVENTARIO} - set(ids_insumo)
+        faltantes = {i[0] for i in INSUMOS} - set(ids_insumo)
         if faltantes:
             print(f"La base no tiene los insumos {sorted(faltantes)}. Regenérala sin --solo-inventario.",
                   file=sys.stderr)
             return 1
-        generar_inventario(con, ids_insumo, ahora)
+        fila = con.execute("SELECT valor FROM meta_dataset WHERE clave = 'semilla'").fetchone()
+        generar_inventario(con, ids_insumo, ahora, fila[0] if fila else args.semilla)
         con.execute("INSERT OR REPLACE INTO meta_dataset VALUES ('inventario_actualizado_en', ?)",
                     (ahora.replace(microsecond=0).isoformat(),))
     else:
@@ -771,7 +778,7 @@ def main(argv: list[str] | None = None) -> int:
         crear_esquema(con)
         ids_insumo, ids_platillo = insertar_catalogos(con)
         generar_historial(con, ids_insumo, ids_platillo, fecha_fin, args.dias, rng)
-        generar_inventario(con, ids_insumo, ahora)
+        generar_inventario(con, ids_insumo, ahora, args.semilla)
         guardar_metadatos(con, args, fecha_fin, ahora)
 
     con.commit()
