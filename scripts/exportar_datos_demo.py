@@ -118,6 +118,7 @@ def main() -> int:
         "horas_anticipacion": alerta_excedente.HORAS_ANTICIPACION,
         "horas_limite_antes_cierre": alerta_excedente.HORAS_LIMITE_ANTES_CIERRE,
         "ventana_minima": alerta_excedente.VENTANA_MINIMA,
+        "aviso_responsabilidad": alerta_excedente.AVISO_RESPONSABILIDAD,
         "recomendaciones": {"refrigerar": gemini_service.recomendaciones_base(True),
                             "ambiente": gemini_service.recomendaciones_base(False)},
         "platillos": {k: {"nombre": p["nombre"], "peso_porcion_kg": p["peso_porcion_kg"],

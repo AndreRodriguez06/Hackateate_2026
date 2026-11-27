@@ -10,7 +10,15 @@
 
 ## 1. El reto
 
-**Pregunta del reto:** ¿cómo puede un restaurante de plaza comercial reducir la merma de sus insumos perecederos sin quedarse sin platillos para sus clientes?
+**Pregunta del reto (Guía del Reto):** ¿Cómo podríamos lograr que el alimento que hoy se tira llegue, a tiempo y sin fricción, a quien sí puede aprovecharlo?
+
+**Nuestra versión acotada:** ¿cómo puede un restaurante de plaza comercial comprar solo lo que va a usar y, si aun así le sobra, vender o donar a tiempo ese alimento sin quedarse sin platillos para sus clientes?
+
+### Frase de delimitación
+
+> En **restaurantes de comida casual de plazas comerciales en México**, el **encargado de compras** pierde **insumos perecederos (proteínas, lácteos, pan, verduras y platillos preparados)** cuando **compra "a ojo" sin anticipar los cambios de demanda por día de la semana, quincena, clima, días festivos o eventos de la plaza**, debido posiblemente a **que no tiene una herramienta que convierta su historial de ventas en una cantidad de compra**. Hoy lo resuelve mediante **su experiencia, listas en papel o Excel y, al cierre, tirando o regalando lo que sobra de manera informal**. Necesitamos comprobar **cuánto se tira realmente (en kg y $) y si el encargado confiaría en una sugerencia de compra automática**.
+
+La frase es una **hipótesis**: se armó con la evidencia secundaria de la sección "Evidencia" y no con entrevistas propias (ver "Cómo identificamos a los usuarios").
 
 ### Problema delimitado
 
@@ -30,6 +38,12 @@ El problema se delimita a: **un restaurante**, **insumos perecederos**, **decisi
 | **Comensales** | Ofertas atractivas en platillos que ya conocen | Menú digital QR (vista previa en la Vista 2) |
 | **Receptores: comedores comunitarios y red estudiantil** | Avisos con tiempo, cantidad exacta y cuidados de inocuidad | Ficha de rescate (Vista 3) |
 | **Dueño** | Evidencia del ahorro | 4 · Historial de compras |
+
+### Cómo identificamos a los usuarios
+
+- **Recorriendo el flujo del alimento** de la pregunta del reto: quién decide cuánto se compra (encargado de compras), quién ve que algo va a sobrar (cocina y gerente de turno), quién puede aprovecharlo (comensales con una promoción y, al final, un comedor comunitario) y quién paga (dueño).
+- **Con la evidencia secundaria:** los servicios de comida generan cerca de 28 % del desperdicio de alimentos en el último eslabón (PNUMA, tabla siguiente), y la mayoría de los restaurantes pequeños compra sin pronóstico (las alternativas actuales son Excel o un punto de venta con inventario, ver `docs/08`, sección 3).
+- **Lo que falta:** **no hicimos entrevistas ni observación en restaurantes reales.** Los usuarios y sus necesidades son supuestos de trabajo. El primer paso del piloto (sección 9) es entrevistar a 3–5 encargados y observar un cierre de cocina para confirmarlos o corregirlos.
 
 ### Evidencia que sustenta el problema
 
@@ -69,6 +83,16 @@ Lo más importante del diseño:
 - **Python hace las cuentas y la IA decide y redacta.** El backend calcula los descuentos rentables, las ventanas de recolección y las porciones, y valida todo lo que propone Gemini. Gemini no puede inventar platillos ni vender por debajo de 1.5 veces el costo.
 - **La demo nunca se cae.** Sin llave de Gemini funciona en modo respaldo; sin servidor, el frontend usa respuestas precalculadas. Ambos modos se indican en pantalla.
 - **Anti-desabasto:** alerta si el margen baja de 4 %, y un margen recomendado por insumo calculado con los errores reales del modelo.
+
+### Alternativas que consideramos
+
+| Alternativa | Qué haría | Por qué la descartamos o la acotamos |
+|---|---|---|
+| **A. App para vender excedentes al público** (estilo Cheaf o Too Good To Go) | Publicar al final del día lo que sobró, con descuento | Ya existe y ataca el síntoma: el alimento ya se compró de más. No reduce la compra excesiva, que es donde empieza la merma. |
+| **B. Plantilla de Excel con promedios** | Promedio de consumo por día de la semana para decidir la compra | Barata y fácil, pero no considera quincena, lluvia, días festivos ni eventos, y depende de que alguien la actualice. La usamos como **línea base** para comparar el modelo. |
+| **C. Básculas o sensores en el almacén** (IoT) | Medir el inventario y la merma de forma automática | Costo de hardware e instalación alto para un restaurante pequeño y no dice cuánto comprar. Puede sumarse después para medir la merma real. |
+| **D. Solo avisar a comedores comunitarios** | Donar lo que sobra al cierre | Necesaria, pero llega tarde: al cierre ya no hay tiempo para una recolección segura. La integramos como último paso, con aviso a media jornada. |
+| ✅ **Elegida: OpsIA** | Predicción de compra + rescate en menú + aviso temprano al comedor + historial | Previene la merma **antes de comprar**; si aun así sobra, la vende con una promoción y, si no se vende, la redirige a tiempo. Solo necesita el historial de ventas que el restaurante ya tiene. |
 
 ### Por qué cada tecnología
 
@@ -204,11 +228,15 @@ Hackateate_2026/
 | 06 | [`docs/06_integracion_gemini.md`](06_integracion_gemini.md) | Esquemas JSON, prompts, validaciones y contingencias |
 | 07 | [`docs/07_integracion_pruebas.md`](07_integracion_pruebas.md) | Bitácora de pruebas de punta a punta y checklist de entrega |
 | 08 | [`docs/08_plan_negocios.md`](08_plan_negocios.md) | Plan de negocios: fuentes verificables, supuestos, competencia, costos, punto de equilibrio e impacto económico |
+| 09 | [`docs/09_checklist_guia.md`](09_checklist_guia.md) | Checklist del proyecto contra la Guía del Reto: qué cumple y qué falta |
 
 ---
 
 ## 8. Limitaciones actuales
 
+- **Sin investigación de campo:** no hicimos entrevistas ni observación en restaurantes ni comedores reales. La frase de delimitación y los usuarios son hipótesis basadas en evidencia secundaria.
+- **Sin validación con usuarios:** nadie fuera del equipo ha usado el prototipo en una tarea real.
+- **Inocuidad:** una fecha de caducidad o una fotografía **no certifican** que un alimento sea apto. La ficha de rescate lo advierte y pide un acuerdo previo con el receptor, pero el prototipo no verifica el estado del alimento.
 - **Datos simulados:** el modelo aprendió reglas que nosotros definimos. Sus métricas prueban el método, no la precisión en un negocio real.
 - **Precios provisionales:** aún no se sustituyen por precios consultados en PROFECO.
 - **Gemini:** la integración está probada con respuestas simuladas y con la API real hasta la autenticación. Hay que confirmar con una llave válida que los textos generados sean adecuados. El modelo por defecto es `gemini-3.5-flash-lite` porque `gemini-2.5-flash` ya no se ofrece a proyectos nuevos.
@@ -221,13 +249,14 @@ Hackateate_2026/
 
 ## 9. Próximos pasos para un piloto real
 
-1. **Línea base real:** pesar la merma de un restaurante durante 4 semanas antes de usar el sistema.
-2. **Cargar datos reales:** exportar ventas e inventario del punto de venta (CSV), registrar con `origen_dato = 'REAL'` y reentrenar el modelo.
-3. **Precios reales:** sustituir los precios por PROFECO *Quién es Quién en los Precios* y facturas del proveedor.
-4. **Medir el valor de Gemini:** prueba A/B de promociones con texto de Gemini contra texto de plantilla.
-5. **Avisos reales:** integrar WhatsApp Business o correo con un comedor comunitario aliado, con protocolo de inocuidad acordado.
-6. **Operación:** usuarios y roles, despliegue en la nube, reentrenamiento semanal automático e inventario con arrastre entre días.
-7. **Evaluar el piloto:** comparar merma, desabasto y margen contra la línea base del paso 1.
+1. **Investigación de campo:** entrevistar a 3–5 encargados de compras y a 1–2 comedores comunitarios, y observar un cierre de cocina, separando lo observado, lo interpretado y lo supuesto.
+2. **Línea base real:** pesar la merma de un restaurante durante 4 semanas antes de usar el sistema.
+3. **Cargar datos reales:** exportar ventas e inventario del punto de venta (CSV), registrar con `origen_dato = 'REAL'` y reentrenar el modelo.
+4. **Precios reales:** sustituir los precios por PROFECO *Quién es Quién en los Precios* y facturas del proveedor.
+5. **Medir el valor de Gemini:** prueba A/B de promociones con texto de Gemini contra texto de plantilla.
+6. **Avisos reales:** integrar WhatsApp Business o correo con un comedor comunitario aliado, con protocolo de inocuidad acordado.
+7. **Operación:** usuarios y roles, despliegue en la nube, reentrenamiento semanal automático e inventario con arrastre entre días.
+8. **Evaluar el piloto:** comparar merma, desabasto y margen contra la línea base del paso 2.
 
 ---
 

@@ -47,7 +47,7 @@ Consultados entre el 2026-11-26 y el 2026-11-27. Los precios de proveedores camb
 | # | Variable | Valor | Por qué este valor | Cómo se valida |
 |---|---|---|---|---|
 | B1 | Tipo de cambio (TC) | **18.00 MXN/USD** | FIX más reciente encontrado (A13, ≤ 17.60) más ~2 % de colchón para no subestimar costos en dólares. | Consultar el FIX del día en Banxico. |
-| B2 | Precio de suscripción (P) | **$799 MXN/mes** por restaurante | Debe ser **menor al 10 %** del ahorro mensual estimado del ejemplo (sección 5: $10,579), para que el dueño recupere la suscripción en días, y cubrir el costo variable (B6). | Entrevistas de disposición a pagar durante el piloto. |
+| B2 | Precio de suscripción (P) | **$799 MXN/mes** por restaurante | Debe ser **menor al 10 %** del ahorro mensual estimado del ejemplo (sección 5: $10,579), para que el dueño recupere la suscripción en días, y cubrir el costo variable (sección 4.2). | Entrevistas de disposición a pagar durante el piloto. |
 | B3 | Tokens por llamada de promociones | **5,943 de entrada / 585 de salida** | Medido en el prototipo: 15,848 caracteres de entrada (instrucción + datos + esquema) y hasta 1,559 de salida, ÷ 4 (A9) × 1.5 de colchón, porque el español suele usar más tokens que el inglés. | Leer `usage_metadata` de las respuestas reales. |
 | B4 | Tokens por ficha de rescate | **906 de entrada / 384 de salida** | Igual que B3: 2,416 y 1,025 caracteres medidos. | Ídem. |
 | B5 | Uso de Gemini por restaurante | **60 optimizaciones + 30 fichas al mes** | 2 optimizaciones de menú y 1 ficha por día, 30 días. | Bitácoras `promociones_generadas` y `alertas_excedente`. |
@@ -55,9 +55,12 @@ Consultados entre el 2026-11-26 y el 2026-11-27. Los precios de proveedores camb
 | B7 | Soporte por restaurante | **1 hora/mes × $150 MXN/h** | Valor de referencia del tiempo del equipo para resolver dudas y revisar capturas. | Registrar horas reales en el piloto. |
 | B8 | Comisión de cobro | **4 % del precio** | Referencia conservadora para pasarelas de pago con tarjeta. | Cotizar con la pasarela elegida. |
 | B9 | Costos fijos mensuales del negocio (CF) | **$5,000 / $15,000 / $30,000 MXN** (tres escenarios) | Desde operar con el equipo fundador sin sueldo hasta pagar medio tiempo de desarrollo y ventas. | Presupuesto real del equipo. |
-| B10 | Tasa de merma base del restaurante | **10 % de las compras de insumos** | Valor de ejemplo propuesto por la Guía del Reto. **No es un promedio de la industria.** | Pesar la merma 4 semanas antes del piloto. |
+| B10 | Tasa de merma base del restaurante | **10 % de las compras de insumos** | **Escenario hipotético nuestro**, elegido como número redondo y por debajo de la merma que dio la simulación (13.4 %, sección 5.3) para no exagerar. **No es evidencia ni un promedio de la industria**: no encontramos una tasa verificable para restaurantes mexicanos (ver nota de la Tabla A). | Pesar la merma 4 semanas antes del piloto. |
 | B11 | Tasa de merma con OpsIA | **6.5 % de las compras** | Reducción relativa de 35 %, la **mitad** de la observada en la simulación (−72 %, sección 1), para no prometer de más. | Pesar la merma durante el piloto. |
 | B12 | Compras mensuales de insumos del restaurante de ejemplo | **$302,267.85 MXN** | Compra tradicional del restaurante **SIMULADO** (sección 1): $3,073,056.50 en 305 días × 30 / 305. | Facturas del restaurante piloto. |
+| B13 | Capacitación inicial por restaurante | **3 horas × $150 MXN/h = $450**, prorrateado en 12 meses = **$37.50 MXN/mes** | Una sesión para cargar menú y recetas (1 h) y enseñar las 4 vistas al encargado (2 h). Mismo costo por hora que B7. | Registrar las horas reales de arranque en el piloto. |
+| B14 | Coordinación con el receptor de donaciones | **0.5 h/mes × $150 MXN/h = $75 MXN/mes** por restaurante | Dar de alta al comedor comunitario, acordar horarios y el protocolo de inocuidad, y resolver incidencias. | Registrar horas de coordinación en el piloto. |
+| B15 | Transporte del excedente | **$0 para OpsIA y para el restaurante** | El receptor recoge en el restaurante dentro de la ventana de recolección (Vista 3). **Riesgo:** si el comedor no tiene vehículo, alguien debe pagar el traslado; no lo incluimos en el precio. | Preguntar a 2–3 comedores si pueden recoger y con qué frecuencia. |
 
 ---
 
@@ -168,13 +171,16 @@ Ejemplo de cómo se lee (sin datos inventados): si el paso 5 diera N_SAM estable
 | Hosting | 0.5 GB × 10 + 0.1 vCPU × 20 + 1 GB × 0.15 (A12, B6) | **USD 7.15 ≈ $128.70 MXN** |
 | Soporte | 1 h × $150 (B7) | **$150.00 MXN** |
 | Comisión de cobro | 4 % × $799 (B8) | **$31.96 MXN** |
-| **CV total** | suma, con TC = 18.00 (B1) | **$314.83 MXN** |
+| Capacitación inicial (prorrateada) | $450 / 12 meses (B13) | **$37.50 MXN** |
+| Coordinación con el receptor | 0.5 h × $150 (B14) | **$75.00 MXN** |
+| Transporte del excedente | lo hace el receptor (B15) | **$0.00 MXN** |
+| **CV total** | suma, con TC = 18.00 (B1) | **$427.33 MXN** |
 
-**Margen de contribución por restaurante:** P − CV = 799 − 314.83 = **$484.17 MXN/mes**.
+**Margen de contribución por restaurante:** P − CV = 799 − 427.33 = **$371.67 MXN/mes**.
 
 Lectura:
 - **Gemini es casi gratis** frente a todo lo demás: $4.17 MXN al mes por restaurante con los supuestos de uso.
-- El costo dominante es el **soporte humano**, seguido del hosting. Una arquitectura multi-restaurante (una instancia para varios) bajaría el hosting; no lo asumimos para no ser optimistas.
+- El costo dominante es el **tiempo humano** (soporte, coordinación con el comedor y capacitación: $262.50 de $427.33), seguido del hosting. Una arquitectura multi-restaurante (una instancia para varios) bajaría el hosting; no lo asumimos para no ser optimistas.
 - En la capa gratuita de Render (A11) el prototipo se puede mostrar sin costo, pero se duerme tras 15 minutos sin uso: sirve para demos, no para operación.
 
 ### 4.3 Punto de equilibrio (break-even)
@@ -185,13 +191,14 @@ N* = CF / (P − CV)          N* = número de restaurantes suscritos para cubrir
 
 | Escenario de costos fijos (B9) | Cálculo | Restaurantes necesarios |
 |---|---|---|
-| CF = $5,000 MXN/mes (equipo fundador sin sueldo; dominio, herramientas) | 5,000 / 484.17 = 10.3 | **11** |
-| CF = $15,000 MXN/mes (medio tiempo de una persona) | 15,000 / 484.17 = 31.0 | **31** |
-| CF = $30,000 MXN/mes (equipo pequeño) | 30,000 / 484.17 = 62.0 | **62** |
+| CF = $5,000 MXN/mes (equipo fundador sin sueldo; dominio, herramientas) | 5,000 / 371.67 = 13.5 | **14** |
+| CF = $15,000 MXN/mes (medio tiempo de una persona) | 15,000 / 371.67 = 40.4 | **41** |
+| CF = $30,000 MXN/mes (equipo pequeño) | 30,000 / 371.67 = 80.7 | **81** |
 
 **Sensibilidad (variables que más mueven el resultado):**
-- Si el soporte se reduce a 30 min/mes: CV = $239.83, margen = $559.17, y con CF = $15,000 bastan **27** restaurantes.
-- Si el precio validado fuera $499: margen = $499 − (128.70 + 4.17 + 150 + 19.96) = $196.17, y con CF = $15,000 se necesitarían **77**. Por eso el precio debe validarse con datos de ahorro reales.
+- Si el soporte se reduce a 30 min/mes: CV = $352.33, margen = $446.67, y con CF = $15,000 bastan **34** restaurantes.
+- Si el restaurante tuviera que pagar el transporte del excedente (B15), ese costo no lo absorbe OpsIA, pero reduce el ahorro del restaurante: por eso la donación solo se activa con un receptor que recoja.
+- Si el precio validado fuera $499: margen = $499 − (128.70 + 4.17 + 150 + 19.96 + 37.50 + 75) = $83.67, y con CF = $15,000 se necesitarían **180**. Por eso el precio debe validarse con datos de ahorro reales.
 
 ---
 
@@ -208,7 +215,7 @@ Compras mensuales de insumos (C) = compra tradicional en 305 días comparables �
 
 Origen del dato: `GET /api/historial-compras?agrupar=mes`, campo `totales.compra_tradicional_mxn` (corrida del 2026-11-26, semilla 42).
 
-### 5.2 Cálculo paso a paso (tasas de la Guía del Reto)
+### 5.2 Cálculo paso a paso (escenario hipotético B10 → B11)
 
 | Paso | Fórmula | Resultado |
 |---|---|---|
@@ -270,7 +277,7 @@ El ejemplo de la sección 5.2 supone una reducción de merma de 35 %, la **mitad
 | **Historial insuficiente** (menos de 60 días) | Predicción débil | Arrancar con el promedio por día de la semana y activar el modelo cuando haya historial; el sistema ya compara contra esa línea base |
 | **Datos simulados no representan la realidad** | Las cifras del prototipo no se cumplen | El plan usa un escenario conservador (35 % contra 72 % simulado); el piloto mide la línea base real |
 | **Dependencia de Gemini** (precio, retiro de modelos, cuota) | Sin texto de promociones | Modo respaldo con reglas locales; modelo configurable (ya ocurrió con `gemini-2.5-flash`, A10); costo de Gemini < 2 % del CV |
-| **Inocuidad en donaciones** | Riesgo sanitario y reputacional | Ventana que termina 2 h antes del cierre, refrigeración a 4 °C o menos, protocolo firmado con el comedor receptor y revisión de la normativa aplicable antes de operar |
+| **Inocuidad en donaciones** | Riesgo sanitario y reputacional | Ventana que termina 2 h antes del cierre, refrigeración a 4 °C o menos, aviso en cada ficha de que una fecha o una foto no certifican que el alimento sea apto, protocolo firmado con el comedor receptor (que revisa el alimento al recibirlo) y revisión de la normativa aplicable antes de operar |
 | **Precio no aceptado** | No se alcanza el punto de equilibrio | Validar disposición a pagar en el piloto; planes por número de platillos o cobro ligado al ahorro medido |
 | **Competencia de POS** que agregue pronóstico | Pérdida de diferenciación | Integrarse con el POS (CSV o API) en lugar de competir; enfoque en merma y rescate |
 
@@ -292,9 +299,9 @@ El ejemplo de la sección 5.2 supone una reducción de merma de 35 %, la **mitad
 | Si preguntan… | Respuesta segura | No digan |
 |---|---|---|
 | "¿Cuánto ahorra un restaurante?" | "No lo sabemos todavía para un restaurante real. En un escenario conservador, de 10 % a 6.5 % de merma sobre $302 mil de compras, serían $9,780 al mes netos. La simulación dio más, pero es simulada; el piloto lo medirá." | "Ahorra $10 mil al mes" sin contexto |
-| "¿De dónde sale el 10 %?" | "Es el valor de ejemplo de la Guía del Reto, marcado como supuesto (B10). No encontramos un promedio verificable de merma en restaurantes mexicanos; por eso el piloto empieza pesando la merma." | "Es el promedio de la industria" |
+| "¿De dónde sale el 10 %?" | "Es un escenario hipotético nuestro, marcado como supuesto (B10), menor que el 13.4 % de la simulación. No encontramos un promedio verificable de merma en restaurantes mexicanos; por eso el piloto empieza pesando la merma." | "Es el promedio de la industria" |
 | "¿Cuál es su mercado?" | "El techo es la rama 7225: 740,231 establecimientos según DENUE 2026. Nuestro segmento es un subconjunto; aquí está el procedimiento para contarlo." | Cualquier número de mercado no calculado |
-| "¿Por qué $799?" | "Es un supuesto: menos del 10 % del ahorro conservador y por encima del costo variable de $315. Lo validamos en el piloto." | "Es lo que cobra la competencia" (no encontramos precios publicados) |
+| "¿Por qué $799?" | "Es un supuesto: menos del 10 % del ahorro conservador y por encima del costo variable de $427 (incluye capacitación y coordinación con el comedor). Lo validamos en el piloto." | "Es lo que cobra la competencia" (no encontramos precios publicados) |
 | "¿Y si Gemini sube de precio?" | "Gemini cuesta unos $4 al mes por restaurante con nuestro uso medido; aunque se multiplicara por 10, seguiría siendo menor que el hosting. Y hay modo respaldo." | "La IA es gratis" |
 | "¿Por qué no usar Cheaf?" | "Es complementaria: Cheaf vende lo que ya sobró y cobra comisión; nosotros evitamos que sobre. Podríamos publicar el excedente ahí." | Hablar mal del competidor |
 | "¿Too Good To Go está en México?" | "No encontramos confirmación de que opere para consumidores en México; lo usamos como referencia internacional." | Afirmar que opera |
