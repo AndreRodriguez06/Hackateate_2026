@@ -161,6 +161,7 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(d["ficha"]["ventana_recoleccion"]["fin"], "18:00")       # 2 h antes del cierre
         self.assertGreaterEqual(len(d["ficha"]["recomendaciones_inocuidad"]), 2)
         self.assertTrue(d["ficha"]["mensaje"])
+        self.assertIn("no certifican", d["ficha"]["aviso_responsabilidad"])   # inocuidad: acuerdo con el receptor
         enviada = self.cliente.post(f"/api/alerta-excedente/{d['alerta_id']}/enviar").json()
         self.assertTrue(enviada["envio_simulado"])
 

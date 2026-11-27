@@ -225,6 +225,7 @@
           alimento: `${sobrante} porciones de ${p.nombre}`, platillo: p.nombre, porciones: sobrante, cantidad_aprox_kg: kg,
           ventana_recoleccion: { inicio: hora24(inicio), fin: hora24(fin), horas_antes_del_cierre: A.cierre - fin },
           recomendaciones_inocuidad: recomendaciones, nota_inocuidad: recomendaciones.join(' '),
+          aviso_responsabilidad: A.aviso_responsabilidad,
           destinatario_sugerido: 'Comedor comunitario / Red Campus',
           mensaje: `Hola, somos Cafetería La Esquina. Hoy tenemos ${sobrante} porciones de ${p.nombre} (aprox. ${kg} kg) ` +
                    `disponibles para donación. Pueden recogerlas entre ${hora24(inicio)} y ${hora24(fin)}. ${recomendaciones[0]}`,
@@ -761,6 +762,10 @@
     }
   }
 
+  const AVISO_RESPONSABILIDAD = 'Una fecha de caducidad o una fotografía no certifican que el alimento sea apto. '
+    + 'La donación se hace solo con un acuerdo previo con el receptor, que revisa temperatura, olor y aspecto al recibirlo. '
+    + 'Ante cualquier duda, no se dona.';
+
   function pintarDespacho(r, fuente) {
     const f = r.ficha;
     const v = f.ventana_recoleccion;
@@ -780,7 +785,10 @@
               <span class="text-slate-500 font-normal">(límite ${num(v.horas_antes_del_cierre)} h antes del cierre)</span></dd></div>
           <div class="px-5 py-3 grid sm:grid-cols-3 gap-1"><dt class="text-slate-500 flex items-center gap-2"><i data-lucide="shield-check" class="w-4 h-4"></i> Nota de inocuidad</dt>
             <dd class="sm:col-span-2 font-medium"><ul class="list-disc ml-4 space-y-0.5">${(f.recomendaciones_inocuidad || [f.nota_inocuidad])
-              .map((x) => `<li>${esc(x)}</li>`).join('')}</ul></dd></div>
+              .map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
+              <p class="mt-2 text-xs font-normal text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex gap-2">
+                <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+                <span>${esc(f.aviso_responsabilidad || AVISO_RESPONSABILIDAD)}</span></p></dd></div>
           <div class="px-5 py-3 grid sm:grid-cols-3 gap-1"><dt class="text-slate-500 flex items-center gap-2"><i data-lucide="users" class="w-4 h-4"></i> Destinatario</dt>
             <dd class="sm:col-span-2 font-medium">${esc(f.destinatario_sugerido)}</dd></div>
           <div class="px-5 py-3 grid sm:grid-cols-3 gap-1"><dt class="text-slate-500 flex items-center gap-2"><i data-lucide="message-square" class="w-4 h-4"></i> Mensaje</dt>

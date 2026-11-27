@@ -39,6 +39,10 @@ HORAS_ANTICIPACION = 1.0       # la recolección empieza 1 h después del aviso
 HORAS_LIMITE_ANTES_CIERRE = gemini_service.HORAS_MINIMAS_ANTES_CIERRE   # 2 h
 VENTANA_MINIMA = 0.5           # una ventana de menos de 30 min no es operable
 CATEGORIAS_REFRIGERAR = {"proteína", "lácteo"}
+# Una fecha o una foto no certifican que un alimento sea apto (Guía del Reto, inocuidad).
+AVISO_RESPONSABILIDAD = ("Una fecha de caducidad o una fotografía no certifican que el alimento sea apto. "
+                         "La donación se hace solo con un acuerdo previo con el receptor, que revisa "
+                         "temperatura, olor y aspecto al recibirlo. Ante cualquier duda, no se dona.")
 
 
 def hora_a_decimal(texto: str) -> float:
@@ -170,6 +174,7 @@ def evaluar(con: sqlite3.Connection, ahora: datetime, platillo_clave: str, hora_
                                 "horas_antes_del_cierre": f["horas_antes_del_cierre"]},
         "recomendaciones_inocuidad": f["recomendaciones_inocuidad"],
         "nota_inocuidad": " ".join(f["recomendaciones_inocuidad"]),
+        "aviso_responsabilidad": AVISO_RESPONSABILIDAD,
         "destinatario_sugerido": "Comedor comunitario / Red Campus",
         "mensaje": f["mensaje"],
     }
