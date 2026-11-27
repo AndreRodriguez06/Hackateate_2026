@@ -1,6 +1,6 @@
-# Opsia
+# OpsIA
 
-*Nombre inspirado en Ops, diosa romana de la abundancia y las cosechas.*
+*Nombre inspirado en Ops, diosa romana de la abundancia y las cosechas y en la implementación de la IA.*
 
 **El problema:** los restaurantes compran sus insumos perecederos "a ojo". Si compran de más, la comida caduca y se tira; si recortan al tanteo, se quedan sin platillos. **Opsia** predice cuánto comprar de cada insumo (Machine Learning), propone promociones rentables para vender lo que está por caducar (Google Gemini) y avisa a tiempo a comedores comunitarios cuando va a sobrar comida.
 
