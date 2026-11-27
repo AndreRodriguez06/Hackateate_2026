@@ -1,4 +1,4 @@
-# Opsia — dependencias de Python (probado con Python 3.10 y 3.13)
+# OpsIA — dependencias de Python (probado con Python 3.10 y 3.13)
 # Instalar:  pip install -r requirements.txt
 
 # Backend y API

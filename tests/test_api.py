@@ -106,16 +106,28 @@ class TestAPI(unittest.TestCase):
             self.assertTrue(criticos & set(menu[e["platillo_clave"]]["receta"]))
             self.assertGreaterEqual(e["precio_oferta_mxn"], 1.5 * e["costo_insumos_porcion_mxn"])
 
+    def _platillo_con_critico(self):
+        """Un platillo del menú que use alguno de los insumos críticos de hoy (el inventario es aleatorio)."""
+        criticos = {l["clave"] for l in self.cliente.get("/api/inventario", params={"estado": "CRITICO"}).json()["lotes"]}
+        with db.sesion() as con:
+            menu = db.platillos_con_recetas(con)
+        for p in sorted(menu.values(), key=lambda p: p["clave"]):
+            if criticos & set(p["receta"]) and rescate_menu.descuento_rentable(p) and rescate_menu.descuento_rentable(p) >= 10:
+                return p
+        self.fail(f"ningún platillo usa los críticos {criticos}")
+
     def test_optimizar_menu_con_gemini_valido(self):
-        with gemini_falso({"platillo_clave": "enchiladas_suizas", "descuento_pct": 20,
-                           "insumos_criticos_usados": ["inventado"], "justificacion": "Usa pollo y crema.",
+        p = self._platillo_con_critico()
+        with gemini_falso({"platillo_clave": p["clave"], "descuento_pct": 10,
+                           "insumos_criticos_usados": ["inventado"], "justificacion": "Usa el insumo crítico.",
                            "copy_promocional": "Texto de prueba"}):
             d = self.cliente.post("/api/optimizar-menu", json={"max_estrategias": 1}).json()
-        self.assertEqual(d["modo"], "gemini")
+        self.assertEqual(d["modo"], "gemini", d.get("motivo_fallback"))
         e = d["estrategias"][0]
+        self.assertEqual(e["platillo_clave"], p["clave"])
         self.assertEqual(e["copy_promocional"], "Texto de prueba")
-        self.assertEqual(e["justificacion"], "Usa pollo y crema.")
-        self.assertEqual(e["precio_oferta_mxn"], 96)                       # 120 × (1 − 20 %)
+        self.assertEqual(e["justificacion"], "Usa el insumo crítico.")
+        self.assertEqual(e["precio_oferta_mxn"], round(p["precio_venta_mxn"] * 0.90))     # precio × (1 − 10 %)
         self.assertTrue(all(r["clave"] != "inventado" for r in e["insumos_rescatados"]))  # cifras del backend
 
     def test_optimizar_menu_rechaza_platillo_inventado(self):

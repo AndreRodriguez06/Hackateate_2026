@@ -18,7 +18,7 @@ Demostrar que cualquier persona puede clonar el repositorio, instalarlo y usar e
 | `git clone` desde GitHub en carpeta vacía + entorno virtual nuevo | Simula una computadora limpia. |
 | Python 3.10.20 y 3.13.18 | Versión mínima declarada y versión reciente. |
 | `requirements.txt` con versiones fijas | Instalación reproducible. |
-| `python -m unittest` (65 pruebas; 56 en la corrida original) | Pruebas unitarias y de API. |
+| `python -m unittest` (66 pruebas; 56 en la corrida original) | Pruebas unitarias y de API. |
 | `scripts/prueba_humo.py` (8 casos) | Prueba de punta a punta por HTTP; cualquiera la puede correr. |
 | Chromium + Playwright (8 casos) | Prueba de punta a punta en navegador. |
 | Llamada real a la API de Gemini con llave falsa | Verifica el respaldo ante un error real de Google. |
@@ -123,10 +123,10 @@ Cambios probados:
 
 Defecto encontrado en esta regresión: un modelo entrenado con `python ml/modelo_demanda.py entrenar` guardaba la clase como `__main__.RandomForestRelativo` y el backend no podía leerlo. Se corrigió ejecutando el comando desde el módulo `ml.modelo_demanda`; lo cubre la prueba `test_modelo_entrenado_desde_la_terminal_se_puede_cargar`.
 
-### 4.7 Regresión del 2026-11-27 (Opsia, lista de compras, sin Auditoría, zoom)
+### 4.7 Regresión del 2026-11-27 (OpsIA, lista de compras, sin Auditoría, zoom)
 
 Cambios probados:
-- el nombre pasó de ZeroMerma AI a **Opsia** (incluidas las variables de entorno `OPSIA_*`);
+- el nombre pasó de ZeroMerma AI a **OpsIA** (incluidas las variables de entorno `OPSIA_*`);
 - se eliminaron la vista y el endpoint de Auditoría y backtesting, y la carpeta `prueba1/`;
 - se agregaron la lista de compras en la Vista 1 y el zoom en la gráfica del Historial (ahora Vista 4);
 - el modelo de Gemini por defecto pasó a `gemini-3.5-flash-lite`;
@@ -138,7 +138,16 @@ Cambios probados:
 | REG-08 | `python scripts/prueba_humo.py` | ✅ 8/8 | `/api/auditoria` responde 404 |
 | REG-09 | Lista de compras (escritorio, `file://` y 390 px) | ✅ | Pollo 12 %, tortilla 8 % y crema 2 % (con aviso de desabasto) → total $1,621; al cambiar a "Viernes de Quincena + Lluvia" se recalcula a $2,783; editar la tortilla a 20 % → 14.7 kg; quitar crema; copiar al portapapeles; descargar `lista_compras_viernes.csv`; la lista se conserva al recargar |
 | REG-10 | Zoom del historial por día (los 3 modos) | ✅ | Sin zoom: 365 periodos; 4 × Acercar → 23 días; rueda → 21; arrastrar mueve el rango; "Ver todo" regresa a 365 |
-| REG-11 | Nombre y pestañas | ✅ | Título "Opsia"; 4 pestañas; sin errores en consola ni desplazamiento horizontal |
+| REG-11 | Nombre y pestañas | ✅ | Título "OpsIA"; 4 pestañas; sin errores en consola ni desplazamiento horizontal |
+
+### 4.8 Regresión del 2026-11-27 (inventario aleatorio y nombre OpsIA)
+
+| ID | Prueba | Resultado | Detalle observado |
+|---|---|---|---|
+| REG-12 | `python -m unittest discover -s tests` | ✅ 66/66 | Prueba nueva: el inventario se repite con la misma semilla y día, y cambia con otro día u otra semilla; de 3 a 5 críticos; todos los insumos con lote. La prueba de Gemini válido ahora elige un platillo que use los críticos del día |
+| REG-13 | Inventario de 60 días seguidos (semilla 42) | ✅ | 32 insumos distintos salieron como críticos; los más frecuentes: pollo, queso, carne molida |
+| REG-14 | Semillas 42 y 7 el mismo día | ✅ | Críticos distintos (chile serrano, tomate verde, piña / rábano, pan de hamburguesa, masa, tocino) |
+| REG-15 | Arranque del servidor con inventario de otro día | ✅ | Genera el inventario del día al arrancar |
 
 ## 5. Defectos encontrados y corregidos durante la integración
 
@@ -171,7 +180,7 @@ En una computadora que **no** haya tenido el proyecto:
 - [ ] `python -m venv .venv`, activarlo y `pip install -r requirements.txt` sin errores.
 - [ ] `python data/generar_datos.py` termina con "Verificación OK".
 - [ ] `uvicorn backend.main:app --reload` arranca y <http://localhost:8000> muestra el distintivo ámbar y "API conectada".
-- [ ] `python -m unittest discover -s tests` → 65 pruebas OK.
+- [ ] `python -m unittest discover -s tests` → 66 pruebas OK.
 - [ ] Con el servidor encendido, `python scripts/prueba_humo.py` → 8/8.
 - [ ] Sin `.env`: la Vista 2 muestra "Reglas locales (modo respaldo)".
 - [ ] Con `.env` y llave real: la Vista 2 muestra "Generado con Gemini · gemini-3.5-flash-lite".
@@ -196,7 +205,7 @@ Recomendaciones para la demo:
 ## 9. Cómo repetir estas pruebas
 
 ```bash
-python -m unittest discover -s tests -v        # 65 pruebas
+python -m unittest discover -s tests -v        # 66 pruebas
 uvicorn backend.main:app                       # en otra terminal
 python scripts/prueba_humo.py                  # 8 casos de punta a punta
 ```

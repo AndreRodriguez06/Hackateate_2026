@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Opsia — Exporta los datos del "modo demo autónoma" del frontend
+OpsIA — Exporta los datos del "modo demo autónoma" del frontend
 Archivo: /scripts/exportar_datos_demo.py
 
 Genera `frontend/datos_demo.js` con respuestas REALES del backend y del modelo

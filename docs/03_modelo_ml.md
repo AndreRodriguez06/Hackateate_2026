@@ -178,8 +178,8 @@ Las tres estrategias se evalúan contra el consumo real del último mes, valuado
 | Estrategia | Compra | Sobrante | Demanda no cubierta | Días-insumo con algún faltante |
 |---|---|---|---|---|
 | Compra tradicional "a ojo" | $322,472 | $133,832 | 1.51 % | 4.7 % |
-| Opsia, margen fijo 8 % | $195,397 | $10,579 | 3.51 % | 42.2 % |
-| **Opsia, margen recomendado** | **$214,025** | **$24,318** | **0.96 %** | **12.4 %** |
+| OpsIA, margen fijo 8 % | $195,397 | $10,579 | 3.51 % | 42.2 % |
+| **OpsIA, margen recomendado** | **$214,025** | **$24,318** | **0.96 %** | **12.4 %** |
 
 Lectura:
 - Con el margen recomendado se compra **34 % menos** y el sobrante baja **82 %**, y la demanda no cubierta es **menor** que con la compra tradicional (0.96 % contra 1.51 %).
@@ -194,7 +194,7 @@ Para mostrar cuánto se habría ahorrado en **todo** el historial, `predicciones
 - Después, cada bloque de 30 días se predice con un modelo entrenado **solo con los días anteriores** (ventana creciente).
 - Compra sugerida = predicción × (1 + margen recomendado del insumo).
 
-El resultado se guarda dentro de `modelo_rf.pkl` (`paquete["historico"]`) y lo usa `GET /api/historial-compras`. Resultado sobre los 305 días comparables (todos los insumos, precios SIMULADOS): compra $3.07 M (tradicional) contra $2.16 M (Opsia), es decir **$915 mil menos (−29.8 %)**; merma −72.4 %; demanda no cubierta 0.98 % contra 1.00 %.
+El resultado se guarda dentro de `modelo_rf.pkl` (`paquete["historico"]`) y lo usa `GET /api/historial-compras`. Resultado sobre los 305 días comparables (todos los insumos, precios SIMULADOS): compra $3.07 M (tradicional) contra $2.16 M (OpsIA), es decir **$915 mil menos (−29.8 %)**; merma −72.4 %; demanda no cubierta 0.98 % contra 1.00 %.
 
 > Simplificación: el margen recomendado se calcula con el periodo de entrenamiento y se aplica a todo el historial.
 

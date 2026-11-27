@@ -5,13 +5,13 @@
 
 ## 1. Objetivo
 
-Definir **qué hace** Opsia, **cómo se organiza** el código y **cómo se comunican** sus partes, antes de escribir el backend, el modelo y la integración con Gemini. Este documento es el contrato que siguen los 5 integrantes del equipo.
+Definir **qué hace** OpsIA, **cómo se organiza** el código y **cómo se comunican** sus partes, antes de escribir el backend, el modelo y la integración con Gemini. Este documento es el contrato que siguen los 5 integrantes del equipo.
 
 ## 2. Problema y propuesta
 
 Un restaurante de plaza comercial compra insumos perecederos **por intuición**. Si compra de más, el excedente caduca en almacén (merma). Si recorta al tanteo, se queda sin platillos en hora pico (desabasto o *stockout*).
 
-Opsia ataca el problema en tres momentos del día:
+OpsIA ataca el problema en tres momentos del día:
 
 | Momento | Pregunta del encargado | Módulo | Tecnología |
 |---|---|---|---|
@@ -171,7 +171,7 @@ Todas las respuestas incluyen `es_simulado` mientras la base sea simulada.
 
 ```mermaid
 flowchart TD
-    A[Encargado abre Opsia] --> B{Momento del día}
+    A[Encargado abre OpsIA] --> B{Momento del día}
     B -- "Mañana: antes de comprar" --> V1[Vista 1 · Planeador de compras]
     V1 --> V1a[Elige insumo, contexto y margen] --> V1b[Ve compra sugerida, inversión y merma evitada] --> V1d[Agrega a la lista de compras]
     V1b -- "margen < 4 %" --> V1c[Banner de riesgo de desabasto]

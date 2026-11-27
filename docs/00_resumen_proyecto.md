@@ -23,7 +23,7 @@ El problema se delimita a: **un restaurante**, **insumos perecederos**, **decisi
 
 ### Usuarios objetivo
 
-| Usuario | Qué necesita | Vista de Opsia |
+| Usuario | Qué necesita | Vista de OpsIA |
 |---|---|---|
 | **Encargado de compras** | Saber cuánto comprar hoy sin tirar ni quedarse corto | 1 · Planeador de compras |
 | **Personal de cocina y gerente de turno** | Vender hoy lo que está por caducar; saber a media jornada si sobrará comida | 2 · Rescate en menú · 3 · Alerta temprana |
@@ -45,7 +45,7 @@ El problema se delimita a: **un restaurante**, **insumos perecederos**, **decisi
 
 ## 2. La solución y su flujo principal
 
-Opsia acompaña los momentos en que se decide la merma, del día a día al cierre de mes:
+OpsIA acompaña los momentos en que se decide la merma, del día a día al cierre de mes:
 
 ```mermaid
 flowchart LR
@@ -130,7 +130,7 @@ Para comprobar que Gemini funciona: `python backend/gemini_service.py`. Debe mos
 ### Verificar que todo funciona
 
 ```bash
-python -m unittest discover -s tests -v    # 65 pruebas automáticas (datos, modelo, API, Gemini)
+python -m unittest discover -s tests -v    # 66 pruebas automáticas (datos, modelo, API, Gemini)
 python scripts/prueba_humo.py              # 8 casos de punta a punta, con el servidor encendido
 ```
 
@@ -188,7 +188,7 @@ Hackateate_2026/
 ├── backend/     main.py · database.py · gemini_service.py · services/ (rescate_menu, alerta_excedente, historial_compras)
 ├── frontend/    index.html · app.js · datos_demo.js
 ├── scripts/     exportar_datos_demo.py · exportar_csv.py · prueba_humo.py
-├── tests/       65 pruebas automáticas (unittest)
+├── tests/       66 pruebas automáticas (unittest)
 └── docs/        documentación por apartado
 ```
 
@@ -231,4 +231,4 @@ Hackateate_2026/
 
 ---
 
-<sub>Opsia · Prototipo para reto universitario · Todos los datos del restaurante son SIMULADOS.</sub>
+<sub>OpsIA · Prototipo para reto universitario · Todos los datos del restaurante son SIMULADOS.</sub>

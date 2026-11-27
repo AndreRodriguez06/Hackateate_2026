@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Opsia — Prueba de humo end-to-end contra el servidor encendido
+OpsIA — Prueba de humo end-to-end contra el servidor encendido
 Archivo: /scripts/prueba_humo.py
 
 Recorre el flujo completo por HTTP, igual que el navegador:

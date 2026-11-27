@@ -56,7 +56,7 @@ Consultados entre el 2026-11-26 y el 2026-11-27. Los precios de proveedores camb
 | B8 | Comisión de cobro | **4 % del precio** | Referencia conservadora para pasarelas de pago con tarjeta. | Cotizar con la pasarela elegida. |
 | B9 | Costos fijos mensuales del negocio (CF) | **$5,000 / $15,000 / $30,000 MXN** (tres escenarios) | Desde operar con el equipo fundador sin sueldo hasta pagar medio tiempo de desarrollo y ventas. | Presupuesto real del equipo. |
 | B10 | Tasa de merma base del restaurante | **10 % de las compras de insumos** | Valor de ejemplo propuesto por la Guía del Reto. **No es un promedio de la industria.** | Pesar la merma 4 semanas antes del piloto. |
-| B11 | Tasa de merma con Opsia | **6.5 % de las compras** | Reducción relativa de 35 %, la **mitad** de la observada en la simulación (−72 %, sección 1), para no prometer de más. | Pesar la merma durante el piloto. |
+| B11 | Tasa de merma con OpsIA | **6.5 % de las compras** | Reducción relativa de 35 %, la **mitad** de la observada en la simulación (−72 %, sección 1), para no prometer de más. | Pesar la merma durante el piloto. |
 | B12 | Compras mensuales de insumos del restaurante de ejemplo | **$302,267.85 MXN** | Compra tradicional del restaurante **SIMULADO** (sección 1): $3,073,056.50 en 305 días × 30 / 305. | Facturas del restaurante piloto. |
 
 ---
@@ -73,12 +73,12 @@ Dentro de un restaurante, el problema se vuelve financiero en dos lugares:
 
 ### 1.2 La propuesta de valor
 
-> **Opsia le dice al restaurante cuánto comprar, cómo vender lo que está por caducar y a quién avisar antes de tirar comida, con cifras en pesos que se pueden auditar.**
+> **OpsIA le dice al restaurante cuánto comprar, cómo vender lo que está por caducar y a quién avisar antes de tirar comida, con cifras en pesos que se pueden auditar.**
 
 | Momento | Pérdida que ataca | Cómo lo hace | Evidencia en el prototipo (🔵 SIMULADO) |
 |---|---|---|---|
 | Antes de comprar | Sobrecompra | Predicción por insumo con Random Forest y margen de seguridad recomendado | 305 días: compras −29.8 %, merma −72.4 %, demanda no cubierta 0.98 % contra 1.00 % de la compra a ojo |
-| Insumos por caducar | Caducidad en almacén | Promociones sobre platillos **del menú actual**, nunca por debajo de 1.5 × costo, con texto redactado por Gemini | Ejemplo: $1,890 MXN de insumos críticos; 3 promociones rescatan $1,217 y recuperan $2,098 de margen |
+| Insumos por caducar | Caducidad en almacén | Promociones sobre platillos **del menú actual**, nunca por debajo de 1.5 × costo, con texto redactado por Gemini | Ejemplo de una corrida: $1,890 MXN de insumos críticos; 3 promociones rescatan $1,217 y recuperan $2,098 de margen (el inventario simulado cambia cada día) |
 | Antes del cierre | Comida preparada sobrante | Proyección de sobrante y ficha para comedor comunitario, con ventana que termina 2 h antes del cierre | Ficha con porciones, kg, ventana e inocuidad |
 | Fin de mes | Falta de evidencia | Historial de compras contra consumo y contra sugerencia del modelo | Vista 4 por día, semana o mes, con zoom |
 
@@ -131,7 +131,7 @@ Ejemplo de cómo se lee (sin datos inventados): si el paso 5 diera N_SAM estable
 
 ### 3.1 Tabla comparativa
 
-| Criterio | Alternativa 1 · Hojas de cálculo y bitácoras (Excel, cuaderno) | Alternativa 2 · POS tradicional (Soft Restaurant, Poster) | Alternativa 3 · Apps de rescate al cierre (Cheaf; Too Good To Go como referencia internacional) | **Opsia** |
+| Criterio | Alternativa 1 · Hojas de cálculo y bitácoras (Excel, cuaderno) | Alternativa 2 · POS tradicional (Soft Restaurant, Poster) | Alternativa 3 · Apps de rescate al cierre (Cheaf; Too Good To Go como referencia internacional) | **OpsIA** |
 |---|---|---|---|---|
 | Problema que resuelve | Registrar compras e inventario | Ventas, comandas, inventario, recetas y reportes (A16, A17) | Vender excedentes con descuento al final del día (A14) | **Comprar lo justo**, vender lo que caduca y avisar a tiempo |
 | ¿Predice cuánto comprar? | No: depende del criterio de quien llena la hoja | Registra existencias y mínimos/máximos (A16); no encontramos pronóstico de demanda por clima, quincena o festivos en las fuentes revisadas | No | **Sí**: por insumo, con 7 variables de contexto y margen anti-desabasto |
@@ -143,10 +143,10 @@ Ejemplo de cómo se lee (sin datos inventados): si el paso 5 diera N_SAM estable
 
 ### 3.2 Diferenciador claro
 
-1. **Prevenir en lugar de rematar.** Las apps de rescate recuperan una fracción del valor de la comida que ya sobró; Opsia ataca la causa, que es la sobrecompra. Son **complementarias**: la Vista 3 podría publicar el excedente en una app de rescate en vez de, o además de, avisar a un comedor.
-2. **Recomendación accionable y explicable.** Un POS dice cuánto hay; Opsia dice cuánto comprar, por qué (importancia de variables) y con qué margen.
+1. **Prevenir en lugar de rematar.** Las apps de rescate recuperan una fracción del valor de la comida que ya sobró; OpsIA ataca la causa, que es la sobrecompra. Son **complementarias**: la Vista 3 podría publicar el excedente en una app de rescate en vez de, o además de, avisar a un comedor.
+2. **Recomendación accionable y explicable.** Un POS dice cuánto hay; OpsIA dice cuánto comprar, por qué (importancia de variables) y con qué margen.
 3. **IA con guardarraíles financieros.** Gemini elige y redacta, pero el backend impide promociones bajo costo y platillos inventados (`06_integracion_gemini.md`).
-4. **Se integra, no sustituye.** El restaurante conserva su POS; Opsia consume sus exportaciones de ventas.
+4. **Se integra, no sustituye.** El restaurante conserva su POS; OpsIA consume sus exportaciones de ventas.
 
 ---
 
@@ -213,7 +213,7 @@ Origen del dato: `GET /api/historial-compras?agrupar=mes`, campo `totales.compra
 | Paso | Fórmula | Resultado |
 |---|---|---|
 | 1. Merma mensual actual | C × 10 % (B10) | 302,267.85 × 0.10 = **$30,226.78** |
-| 2. Merma con Opsia | C × 6.5 % (B11) | 302,267.85 × 0.065 = **$19,647.41** |
+| 2. Merma con OpsIA | C × 6.5 % (B11) | 302,267.85 × 0.065 = **$19,647.41** |
 | 3. Ahorro bruto mensual | (1) − (2) = C × 3.5 % | **$10,579.37** |
 | 4. Costo de la suscripción | P (B2) | **$799.00** |
 | 5. **Margen neto recuperado** | (3) − (4) | **$9,780.37 MXN/mes** |
@@ -225,7 +225,7 @@ Cada peso de merma evitada es margen neto: el insumo ya no se compra, o se vende
 
 ### 5.3 Contraste con lo que midió la simulación
 
-| Indicador (305 días comparables) | Compra tradicional | Opsia | Fuente |
+| Indicador (305 días comparables) | Compra tradicional | OpsIA | Fuente |
 |---|---|---|---|
 | Compra de insumos | $3,073,056.50 | $2,158,100.02 (−29.8 %) | `/api/historial-compras` |
 | Merma (lo que caduca) | $411,235.19 (13.4 % de lo comprado) | $113,674.79 (5.3 % de lo comprado) | ídem |

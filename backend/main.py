@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Opsia — Backend y API REST (FastAPI)
+OpsIA — Backend y API REST (FastAPI)
 Archivo: /backend/main.py
 
 Arranque (desde la raíz del repositorio):
@@ -12,7 +12,7 @@ Abre http://localhost:8000 (aplicación) o http://localhost:8000/docs (documenta
 
 Al arrancar, si falta algo, el servidor lo prepara solo:
   * sin data/restaurante.db  -> genera los datos SIMULADOS (Apartado 2)
-  * sin lotes a < 24 h        -> refresca las caducidades del inventario para la demo
+  * inventario de otro día o sin lotes a < 24 h -> genera el inventario SIMULADO del día
   * sin ml/modelo_rf.pkl, o entrenado con otros datos -> entrena el modelo (Apartado 3)
 Se puede desactivar con la variable de entorno OPSIA_AUTOPREPARAR=0.
 
@@ -82,8 +82,11 @@ def preparar_entorno() -> None:
         with db.sesion() as con:
             vigentes_criticos = [l for l in db.listar_lotes(con, ahora())
                                  if l["estado"] == "CRITICO" and not l["caducado"]]
-        if not vigentes_criticos:
-            log.info("El inventario no tiene lotes a < 24 h (datos viejos): refrescando caducidades...")
+            fila = con.execute("SELECT valor FROM meta_dataset WHERE clave = 'inventario_actualizado_en'").fetchone()
+        de_otro_dia = not fila or fila[0][:10] != ahora().date().isoformat()
+        if de_otro_dia or not vigentes_criticos:
+            # El inventario es SIMULADO al azar por semilla y día: cada día hay otros insumos críticos.
+            log.info("Generando el inventario SIMULADO del día (otros insumos críticos)...")
             generar_datos.main(["--db", str(ruta_db), "--solo-inventario", "--silencioso"])
     motivo = None
     if not ruta_modelo.exists():
@@ -115,8 +118,8 @@ async def ciclo_de_vida(app: FastAPI):
 # =============================================================================
 
 app = FastAPI(
-    title="Opsia · API",
-    description="API del prototipo Opsia. **Todos los datos son SIMULADOS.**",
+    title="OpsIA · API",
+    description="API del prototipo OpsIA. **Todos los datos son SIMULADOS.**",
     version="1.0.0",
     lifespan=ciclo_de_vida,
 )
@@ -432,7 +435,7 @@ def historial(
 ):
     """
     Lo que se compró cada día (método tradicional), lo que se consumió y lo que habría sugerido
-    Opsia, para todo el historial de la base. La sugerencia es una predicción fuera de
+    OpsIA, para todo el historial de la base. La sugerencia es una predicción fuera de
     muestra: cada día se predice con un modelo que no lo vio.
     """
     try:
@@ -459,9 +462,9 @@ if db.RUTA_FRONTEND.exists():
 else:
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def sin_frontend():
-        return ("<!doctype html><meta charset='utf-8'><title>Opsia</title>"
+        return ("<!doctype html><meta charset='utf-8'><title>OpsIA</title>"
                 "<body style='font-family:system-ui;max-width:40rem;margin:3rem auto;padding:0 1rem'>"
-                "<h1>Opsia · API en línea</h1>"
+                "<h1>OpsIA · API en línea</h1>"
                 "<p>La carpeta <code>/frontend</code> aún no existe (Apartado 5).</p>"
                 "<p>Prueba la API en <a href='/docs'>/docs</a>. Datos SIMULADOS.</p></body>")
 

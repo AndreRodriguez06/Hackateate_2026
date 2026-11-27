@@ -1,5 +1,5 @@
 """
-Opsia — Integración con Google Gemini (sin chatbots)
+OpsIA — Integración con Google Gemini (sin chatbots)
 Archivo: /backend/gemini_service.py
 
 Dos funciones, cada una con una tarea cerrada y salida JSON con esquema fijo
@@ -197,7 +197,7 @@ def _motivo(err: Exception) -> str:
 # 4. Función A — Promociones sobre el menú existente
 # =============================================================================
 
-INSTRUCCION_PROMOCIONES = f"""Eres el motor de optimización de menú de Opsia para un restaurante en México.
+INSTRUCCION_PROMOCIONES = f"""Eres el motor de optimización de menú de OpsIA para un restaurante en México.
 No conversas: devuelves únicamente JSON que cumple el esquema.
 
 Tarea: proponer promociones para vender HOY insumos que caducan en menos de 24 horas.
@@ -340,7 +340,7 @@ def generar_promociones_menu(inventario_critico: list[dict], menu_restaurante: l
 # 5. Función B — Ficha de recolección para comedores comunitarios
 # =============================================================================
 
-INSTRUCCION_FICHA = f"""Eres el módulo de alertas de excedentes de Opsia para un restaurante en México.
+INSTRUCCION_FICHA = f"""Eres el módulo de alertas de excedentes de OpsIA para un restaurante en México.
 No conversas: devuelves únicamente JSON que cumple el esquema.
 
 Tarea: redactar la ficha operativa para que un comedor comunitario o la red estudiantil recoja comida
