@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ZeroMerma AI — Generador de datos históricos SIMULADOS
+Opsia — Generador de datos históricos SIMULADOS
 Archivo: /data/generar_datos.py
 
 Crea la base de datos SQLite `data/restaurante.db` a partir de `data/schema.sql`
@@ -722,7 +722,7 @@ def imprimir_resumen(con: sqlite3.Connection, ruta_db: Path) -> None:
 # =============================================================================
 
 def parsear_argumentos(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Genera la base de datos SIMULADA de ZeroMerma AI.")
+    p = argparse.ArgumentParser(description="Genera la base de datos SIMULADA de Opsia.")
     p.add_argument("--db", type=Path, default=RUTA_DB_DEFAULT, help="Ruta del archivo SQLite a crear.")
     p.add_argument("--dias", type=int, default=365, help="Días de historial (mínimo 150; 365 o más para cubrir todas las épocas del año).")
     p.add_argument("--semilla", type=int, default=42, help="Semilla aleatoria (misma semilla = mismos datos).")

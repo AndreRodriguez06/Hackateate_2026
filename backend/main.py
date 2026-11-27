@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ZeroMerma AI — Backend y API REST (FastAPI)
+Opsia — Backend y API REST (FastAPI)
 Archivo: /backend/main.py
 
 Arranque (desde la raíz del repositorio):
@@ -14,7 +14,7 @@ Al arrancar, si falta algo, el servidor lo prepara solo:
   * sin data/restaurante.db  -> genera los datos SIMULADOS (Apartado 2)
   * sin lotes a < 24 h        -> refresca las caducidades del inventario para la demo
   * sin ml/modelo_rf.pkl, o entrenado con otros datos -> entrena el modelo (Apartado 3)
-Se puede desactivar con la variable de entorno ZEROMERMA_AUTOPREPARAR=0.
+Se puede desactivar con la variable de entorno OPSIA_AUTOPREPARAR=0.
 
 Endpoints:
   GET  /api/salud                         estado del servidor, base, modelo y Gemini
@@ -24,7 +24,6 @@ Endpoints:
   POST /api/optimizar-menu                promociones sobre platillos existentes (Gemini o reglas)
   POST /api/alerta-excedente              proyección de sobrante al cierre y ficha de rescate
   POST /api/alerta-excedente/{id}/enviar  marca el aviso como enviado (envío SIMULADO)
-  GET  /api/auditoria                     backtesting de los últimos días cerrados
   GET  /api/historial-compras             compras día a día de todo el historial vs. sugerencia del modelo
 """
 
@@ -57,7 +56,7 @@ from backend.services import alerta_excedente, historial_compras, rescate_menu  
 from data import generar_datos  # noqa: E402
 from ml import modelo_demanda  # noqa: E402
 
-log = logging.getLogger("zeromerma")
+log = logging.getLogger("opsia")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 
 
@@ -106,7 +105,7 @@ def preparar_entorno() -> None:
 
 @asynccontextmanager
 async def ciclo_de_vida(app: FastAPI):
-    if os.getenv("ZEROMERMA_AUTOPREPARAR", "1") != "0":
+    if os.getenv("OPSIA_AUTOPREPARAR", "1") != "0":
         preparar_entorno()
     yield
 
@@ -116,8 +115,8 @@ async def ciclo_de_vida(app: FastAPI):
 # =============================================================================
 
 app = FastAPI(
-    title="ZeroMerma AI · API",
-    description="API del prototipo ZeroMerma AI. **Todos los datos son SIMULADOS.**",
+    title="Opsia · API",
+    description="API del prototipo Opsia. **Todos los datos son SIMULADOS.**",
     version="1.0.0",
     lifespan=ciclo_de_vida,
 )
@@ -240,22 +239,6 @@ class AlertaRespuesta(BaseModel):
     ventana_viable: bool
     ficha: dict | None
     motivo_sin_ficha: str | None = None
-    es_simulado: bool
-
-
-class PuntoAuditoria(BaseModel):
-    fecha: str
-    compra_tradicional: float
-    demanda_real: float
-    compra_sugerida: float
-
-
-class AuditoriaRespuesta(BaseModel):
-    insumo: dict
-    periodo: dict
-    serie: list[PuntoAuditoria]
-    totales: dict
-    metodologia: str
     es_simulado: bool
 
 
@@ -449,7 +432,7 @@ def historial(
 ):
     """
     Lo que se compró cada día (método tradicional), lo que se consumió y lo que habría sugerido
-    ZeroMerma AI, para todo el historial de la base. La sugerencia es una predicción fuera de
+    Opsia, para todo el historial de la base. La sugerencia es una predicción fuera de
     muestra: cada día se predice con un modelo que no lo vio.
     """
     try:
@@ -467,79 +450,6 @@ def historial(
     return r
 
 
-_CACHE_BACKTEST: dict = {}
-
-
-@app.get("/api/auditoria", response_model=AuditoriaRespuesta, tags=["Vista 4 · Auditoría"])
-def auditoria(
-    dias: int = Query(7, ge=1, le=30, description="Últimos días cerrados a comparar."),
-    insumo: str = Query("pollo", description="Insumo de la serie diaria (clave)."),
-    margen: float | None = Query(None, ge=0, le=0.25, description="Margen fijo. Si se omite, el recomendado por insumo."),
-):
-    """
-    Backtesting: compara, para los últimos `dias` cerrados, la compra tradicional, la demanda real
-    y lo que habría sugerido ZeroMerma AI con un modelo entrenado SOLO con los días anteriores.
-    Los totales suman los 46 insumos.
-    """
-    clave_cache = (dias, margen, db.RUTA_DB.stat().st_mtime if db.RUTA_DB.exists() else 0)
-    try:
-        if clave_cache not in _CACHE_BACKTEST:
-            _CACHE_BACKTEST.clear()
-            _CACHE_BACKTEST[clave_cache] = modelo_demanda.backtest(dias, margen, db.RUTA_DB, db.RUTA_MODELO)
-        bt = _CACHE_BACKTEST[clave_cache]
-    except FileNotFoundError as err:
-        raise error_datos_no_listos(err) from err
-    except ValueError as err:
-        raise HTTPException(status_code=400, detail=str(err)) from err
-
-    claves = [i["clave"] for i in bt["insumos"]]
-    if insumo not in claves:
-        raise HTTPException(status_code=404, detail=f"Insumo no encontrado: {insumo}")
-    j = claves.index(insumo)
-
-    with conexion() as con:
-        vida = {f["clave"]: f["vida_util_dias"] for f in con.execute("SELECT clave, vida_util_dias FROM insumos")}
-    precios = np.array([i["precio_unitario_mxn"] for i in bt["insumos"]])
-    factores = np.array([generar_datos.factor_caducidad(vida[c]) for c in claves])
-    es_kg = np.array([i["unidad"] == "kg" for i in bt["insumos"]])
-    real, trad, zm = bt["consumo_real"], bt["compra_tradicional"], bt["compra_sugerida"]
-
-    def resumen(compra: np.ndarray) -> dict:
-        merma = np.maximum(compra - real, 0) * factores          # lo que caduca y se tira
-        faltante = np.maximum(real - compra, 0)
-        return {
-            "compra_mxn": round(float((compra * precios).sum()), 2),
-            "merma_kg": round(float(merma[:, es_kg].sum()), 2),
-            "merma_mxn": round(float((merma * precios).sum()), 2),
-            "demanda_no_cubierta_pct": round(float((faltante * precios).sum() / (real * precios).sum() * 100), 2),
-        }
-
-    t, z = resumen(trad), resumen(zm)
-    reduccion = (z["merma_mxn"] - t["merma_mxn"]) / t["merma_mxn"] * 100 if t["merma_mxn"] else 0.0
-    info = bt["insumos"][j]
-    return {
-        "insumo": {"clave": info["clave"], "nombre": info["nombre"], "unidad": info["unidad"],
-                   "margen_aplicado": round(float(bt["margenes"][j]), 3)},
-        "periodo": {"desde": bt["fechas"][0], "hasta": bt["fechas"][-1], "dias": dias,
-                    "modelo_entrenado_hasta": bt["entrenado_hasta"]},
-        "serie": [{"fecha": f, "compra_tradicional": round(float(trad[k, j]), 2),
-                   "demanda_real": round(float(real[k, j]), 2), "compra_sugerida": round(float(zm[k, j]), 2)}
-                  for k, f in enumerate(bt["fechas"])],
-        "totales": {
-            "tradicional": t,
-            "zeromerma": z,
-            "ahorro_compra_mxn": round(t["compra_mxn"] - z["compra_mxn"], 2),
-            "merma_evitada_kg": round(t["merma_kg"] - z["merma_kg"], 2),
-            "merma_evitada_mxn": round(t["merma_mxn"] - z["merma_mxn"], 2),
-            "reduccion_merma_pct": round(reduccion, 1),
-        },
-        "metodologia": ("Modelo reentrenado solo con días anteriores al periodo (sin fuga de datos). "
-                        "Merma = sobrante × fracción que caduca según la vida útil del insumo. "
-                        "kg solo suma insumos medidos en kg. Precios SIMULADOS."),
-        "es_simulado": es_simulado(bt["origen_dato"]),
-    }
-
-
 # =============================================================================
 # Frontend estático en "/"  (se monta al final para no tapar las rutas /api)
 # =============================================================================
@@ -549,9 +459,9 @@ if db.RUTA_FRONTEND.exists():
 else:
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def sin_frontend():
-        return ("<!doctype html><meta charset='utf-8'><title>ZeroMerma AI</title>"
+        return ("<!doctype html><meta charset='utf-8'><title>Opsia</title>"
                 "<body style='font-family:system-ui;max-width:40rem;margin:3rem auto;padding:0 1rem'>"
-                "<h1>ZeroMerma AI · API en línea</h1>"
+                "<h1>Opsia · API en línea</h1>"
                 "<p>La carpeta <code>/frontend</code> aún no existe (Apartado 5).</p>"
                 "<p>Prueba la API en <a href='/docs'>/docs</a>. Datos SIMULADOS.</p></body>")
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-ZeroMerma AI — Prueba de humo end-to-end contra el servidor encendido
+Opsia — Prueba de humo end-to-end contra el servidor encendido
 Archivo: /scripts/prueba_humo.py
 
 Recorre el flujo completo por HTTP, igual que el navegador:
 frontend → inventario → predicción (caso normal y borde de desabasto) → promociones →
-alerta de excedentes → envío → auditoría.
+alerta de excedentes → envío → historial de compras.
 
 Solo usa la librería estándar. Uso (con el servidor corriendo en otra terminal):
     python scripts/prueba_humo.py                       # http://localhost:8000
@@ -124,16 +124,7 @@ def _():
     return f"{r['ficha']['porciones']} porciones, {v['inicio']}–{v['fin']}, modo {r['modo']}"
 
 
-@caso("08 Auditoría de 7 días sin fuga de datos")
-def _():
-    st, r = llamar("GET", "/api/auditoria?dias=7&insumo=pollo")
-    assert st == 200 and len(r["serie"]) == 7, f"{st} {r}"
-    assert r["periodo"]["modelo_entrenado_hasta"] < r["periodo"]["desde"], "el modelo vio los días evaluados"
-    t = r["totales"]
-    return f"merma {t['reduccion_merma_pct']} %, {t['merma_evitada_kg']} kg, ${t['merma_evitada_mxn']:,.0f}"
-
-
-@caso("09 Historial de compras por mes (todos los productos y uno)")
+@caso("08 Historial de compras por mes (todos los productos y uno)")
 def _():
     st, r = llamar("GET", "/api/historial-compras?agrupar=mes")
     assert st == 200 and r["unidad"] == "MXN", f"{st} {r}"

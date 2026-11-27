@@ -1,7 +1,7 @@
 # 06 · Integración de Google Gemini (sin chatbots)
 
 > **Apartado 6 · Orden 3.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado sin llave (`tests/test_gemini_service.py`, 22 pruebas; total del repositorio, 66).
+> Estado: ✅ implementado y probado sin llave (`tests/test_gemini_service.py`, 22 pruebas; total del repositorio, 65).
 > ⏳ **Pendiente:** probar con una `GEMINI_API_KEY` válida. Ver la sección 9.
 
 > ⚠️ Gemini trabaja sobre datos **SIMULADOS** (inventario, menú y precios del Apartado 2). La interfaz siempre indica si un resultado viene de Gemini o del modo respaldo.
@@ -161,7 +161,7 @@ Técnicas usadas:
 ### 6.1 Instrucción de sistema · Función A
 
 ```text
-Eres el motor de optimización de menú de ZeroMerma AI para un restaurante en México.
+Eres el motor de optimización de menú de Opsia para un restaurante en México.
 No conversas: devuelves únicamente JSON que cumple el esquema.
 
 Tarea: proponer promociones para vender HOY insumos que caducan en menos de 24 horas.
@@ -201,7 +201,7 @@ Contenido enviado (ejemplo real del 2026-11-26, con 1 de los 18 candidatos):
 ### 6.2 Instrucción de sistema · Función B
 
 ```text
-Eres el módulo de alertas de excedentes de ZeroMerma AI para un restaurante en México.
+Eres el módulo de alertas de excedentes de Opsia para un restaurante en México.
 No conversas: devuelves únicamente JSON que cumple el esquema.
 
 Tarea: redactar la ficha operativa para que un comedor comunitario o la red estudiantil recoja comida
@@ -274,7 +274,7 @@ El tiempo máximo de espera (15 s) evita que la demo se congele si la red es len
 **Sin llave (lo que ya se probó):**
 
 ```bash
-python -m unittest discover -s tests -v     # 66 pruebas, 22 de Gemini
+python -m unittest discover -s tests -v     # 65 pruebas, 22 de Gemini
 python backend/gemini_service.py            # imprime promociones y ficha en modo respaldo
 ```
 

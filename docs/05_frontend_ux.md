@@ -20,7 +20,7 @@ Dar al personal de cocina una herramienta que se entienda **en segundos**, en lo
 | `frontend/datos_demo.js` | Respuestas precalculadas para el modo demo autónoma (≈ 110 KB). |
 | `scripts/exportar_datos_demo.py` | Genera `datos_demo.js` llamando al backend y al modelo reales. |
 
-Archivos: `frontend/index.html` (estructura de las 5 vistas) y `frontend/app.js` (conexión, respaldo y lógica de cada vista).
+Archivos: `frontend/index.html` (estructura de las 4 vistas) y `frontend/app.js` (conexión, respaldo y lógica de cada vista).
 
 ## 3. Cómo abrirlo
 
@@ -60,8 +60,7 @@ flowchart TD
 | Optimizar menú (Vista 2) | `POST /api/optimizar-menu` | Promociones exportadas de las reglas del backend. |
 | Proyección y ficha (Vista 3) | `POST /api/alerta-excedente` | Mismas fórmulas portadas a JS con las constantes exportadas. |
 | Enviar aviso (Vista 3) | `POST /api/alerta-excedente/{id}/enviar` | Solo confirmación local. |
-| Auditoría (Vista 4) | `GET /api/auditoria` | Backtest exportado de los 46 insumos. |
-| Historial de compras (Vista 5) | `GET /api/historial-compras` | Registros diarios exportados (365 días × 46 insumos); la agrupación por semana o mes se hace en JS con la misma regla del backend. |
+| Historial de compras (Vista 4) | `GET /api/historial-compras` | Registros diarios exportados (365 días × 46 insumos); la agrupación por semana o mes se hace en JS con la misma regla del backend. |
 
 **Verificado:** con servidor y sin servidor la interfaz muestra exactamente las mismas cifras para los mismos controles (por ejemplo, sábado navideño festivo con evento en la plaza: 260 clientes y 23.5 kg de pollo). En el historial de compras la diferencia máxima es de unos $25 sobre $3 millones, por el redondeo a 2 decimales del respaldo.
 
@@ -70,7 +69,7 @@ Reglas de la capa de conexión (`api()` y `conRespaldo()` en `app.js`):
 - **400, 404 o 422** (entrada inválida): **no** cambia de modo; muestra el mensaje del servidor en la vista.
 - El indicador de la barra superior dice siempre de dónde vienen los datos: **API conectada** (verde) o **Modo demo autónoma** (ámbar, con banner y botón "Reintentar conexión").
 
-## 5. Las 5 vistas
+## 5. Las 4 vistas
 
 ### Vista 1 · Planeador de compras (ML)
 
@@ -93,6 +92,7 @@ Reglas de la capa de conexión (`api()` y `conRespaldo()` en `app.js`):
   - Merma evitada, en unidades y $MXN. Si la compra habitual se quedaría corta (día de alta demanda), la tarjeta dice por cuánto.
 - **Banner de desabasto** si el margen es menor a 4 %.
 - **Margen recomendado** del insumo, con un botón "Usar".
+- **Lista de compras:** se elige un insumo, se ajusta su margen y se pulsa **Agregar a la lista de compras**; así con los demás. La tabla muestra cantidad, margen (editable en la propia lista), costo y total, y se puede **copiar** (para WhatsApp o Excel), **descargar en CSV** o **vaciar**. Si cambia el día o el contexto, todas las cantidades se recalculan. La lista se guarda en el navegador.
 - **Gráfica de importancia de variables:** valores reales del modelo, no ilustrativos. Como el modelo aprende el índice relativo al día de la semana, la gráfica explica qué sube o baja un día respecto a un día normal.
 
 ### Vista 2 · Rescate rentable en menú (Gemini)
@@ -117,29 +117,16 @@ Reglas de la capa de conexión (`api()` y `conRespaldo()` en `app.js`):
 - **📢 Generar Ficha de Rescate Temprano:** alimento y kg, ventana de recolección, nota de inocuidad, destinatario y mensaje listo para copiar.
 - **Enviar aviso:** toast verde que aclara que **el envío es SIMULADO**.
 
-### Vista 4 · Auditoría y backtesting
-
-- **4 KPIs:**
-  - reducción relativa de merma (%);
-  - merma evitada en kg;
-  - merma evitada en $MXN;
-  - demanda no cubierta, comparada con la compra tradicional.
-- **Gráfica diaria** de los últimos 7 días cerrados: barras de compra tradicional y compra sugerida, línea de demanda real. Se puede cambiar el insumo.
-- **Acordeón "Fuentes, Supuestos y Metodología":**
-  - declaración de datos SIMULADOS;
-  - estado real de los precios (SIMULADOS provisionales; fuente prevista PROFECO *Quién es Quién en los Precios*);
-  - contexto FAO/PNUMA;
-  - metodología del backtest sin fuga de datos.
-
-### Vista 5 · Historial de compras
+### Vista 4 · Historial de compras
 
 - **Controles:** agrupar por día, semana o mes; producto (todos, en $MXN, o uno de los 46, en su unidad).
 - **4 KPIs** sobre los días comparables:
   - compra tradicional;
-  - compra con ZeroMerma AI y su demanda no cubierta;
+  - compra con Opsia y su demanda no cubierta;
   - **cuánto se habría ahorrado** en compras;
   - merma evitada en $MXN y kg.
-- **Gráfica** con el mismo estilo de la auditoría: barras de compra tradicional y sugerida, línea de consumo real.
+- **Gráfica** con barras de compra tradicional y sugerida y línea de consumo real, con **zoom** (`chartjs-plugin-zoom`): rueda del ratón o pellizco para acercar, arrastrar para moverse, y botones Acercar, Alejar y Ver todo. Sin zoom se ven todas las barras delgadas; al acercar quedan menos barras y más anchas. Un texto indica qué rango se está viendo.
+- **Acordeón "Fuentes, Supuestos y Metodología"** (antes en la vista de auditoría): declaración de datos SIMULADOS, estado de los precios (PROFECO pendiente), contexto FAO/PNUMA y metodología.
 - **Tabla** por periodo (más reciente primero): comprado, consumido, sugerido, ahorro y merma evitada.
 - Los primeros 60 días aparecen sin predicción, en gris: son los que el modelo usa para empezar a entrenar.
 
@@ -157,7 +144,7 @@ Reglas de la capa de conexión (`api()` y `conRespaldo()` en `app.js`):
 | Porciones preparadas "Automático" | Funciona sin capturar nada; se puede corregir si se conoce el dato. |
 | Mensaje de la ficha seleccionable | Se copia y pega en WhatsApp o correo sin reescribir. |
 | Responsivo (probado en 390 px) | El encargado lo usa desde el celular en el almacén. |
-| Enlaces directos por vista (`#rescate`, `#auditoria`) | Para presentar o compartir una vista concreta. |
+| Enlaces directos por vista (`#rescate`, `#historial`) | Para presentar o compartir una vista concreta. |
 | Foco visible, `aria-live` en resultados y `prefers-reduced-motion` | Uso con teclado y lector de pantalla, sin animaciones para quien no las quiere. |
 
 ## 7. Decisiones de diseño: transparencia de datos
@@ -171,7 +158,7 @@ Reglas de la capa de conexión (`api()` y `conRespaldo()` en `app.js`):
 | "Envío SIMULADO" en el botón y en el toast | No se afirma que se contactó a alguien. |
 | Precios declarados como SIMULADOS provisionales | No se atribuyen a PROFECO cifras que aún no se consultaron. |
 | Restaurante "Cafetería La Esquina" marcado como ficticio | No se confunde con un negocio real. |
-| Importancias reales del modelo (día de la semana ≈ 93 %) | El prototipo `prueba1/` usaba pesos ilustrativos; aquí se muestran los verdaderos aunque sean menos vistosos. |
+| Importancias reales del modelo | Se muestran los valores verdaderos del Random Forest, no pesos ilustrativos. |
 | Textos de Gemini insertados como texto, no como HTML (`esc()`) | Un texto generado no puede inyectar código en la página. |
 
 ## 8. Evidencia: SIMULADO vs. REAL
@@ -205,7 +192,7 @@ Preparación (antes de entrar):
 
 | Min | Vista | Qué hacer | Qué decir |
 |---|---|---|---|
-| 0:00–0:45 | Barra superior | Señalar el distintivo ámbar y "API conectada". | "Un restaurante de plaza compra perecederos a ojo: o tira comida o se queda sin platillos. ZeroMerma decide en 4 momentos del día. Todo lo que verán son datos SIMULADOS y lo marcamos siempre." |
+| 0:00–0:45 | Barra superior | Señalar el distintivo ámbar y "API conectada". | "Un restaurante de plaza compra perecederos a ojo: o tira comida o se queda sin platillos. Opsia decide en 4 momentos del día. Todo lo que verán son datos SIMULADOS y lo marcamos siempre." |
 | 0:45–2:30 | 1 · Planeador | Pechuga de pollo, martes (113 clientes). Cambiar el escenario a **Viernes de Quincena + Lluvia** (194). Después: sábado, temporada navideña, festivo y evento en la plaza (260). | "El Random Forest predice el consumo de 46 insumos con el día, la quincena, la lluvia, los eventos, los días festivos y la época del año. Compra sugerida = demanda × (1 + margen)." |
 | | | Bajar el margen a **2 %**: aparece el banner rojo. Pulsar **Usar** el margen recomendado. | "Si el encargado recorta demasiado, avisamos del desabasto. El margen recomendado sale de los errores reales del modelo en días que no había visto: cubre 9 de cada 10 días." |
 | | | Señalar la gráfica de importancia. | "El día de la semana fija la base; la época del año, la lluvia, la quincena, los eventos y los festivos explican cuánto se aleja un día de lo normal." |
@@ -215,8 +202,7 @@ Preparación (antes de entrar):
 | 4:15–5:45 | 3 · Alerta | Ritmo **Ventas Lentas**, hora 3:00 PM: alerta naranja. | "A media jornada proyectamos el cierre. Hoy sobrarán 4 porciones." |
 | | | **Generar Ficha** → **Enviar aviso**. | "La ficha da una ventana de 4:00 a 6:00 PM, que termina 2 h antes del cierre para que el comedor alcance a repartir, y las recomendaciones de inocuidad. El envío en el prototipo es simulado; el siguiente paso es WhatsApp." |
 | | | Mover la hora a 5:30 PM. | "Ya no da tiempo para una recolección segura y el sistema lo dice. Por eso la alerta es temprana." |
-| 5:45–6:30 | 4 · Auditoría | Señalar los KPIs. | "Máquina del tiempo: reentrenamos el modelo sin la última semana y comparamos: −85 % de merma y 147 kg evitados. Esa semana fue el Buen Fin, y ahí la compra a ojo cubrió un poco mejor la demanda; lo mostramos tal cual." |
-| 6:30–7:15 | 5 · Historial | Agrupar por mes; luego elegir pechuga de pollo. | "Con los registros de todo el año: se habrían gastado $915 mil menos en compras y la merma bajaría 72 %, con la misma demanda cubierta. Precios simulados; las fuentes y la metodología están aquí." |
+| 5:45–7:15 | 4 · Historial | Agrupar por día y hacer zoom con la rueda del ratón; luego agrupar por mes y elegir pechuga de pollo. | "Con los registros de todo el año: se habrían gastado $915 mil menos en compras y la merma bajaría 72 %, con la misma demanda cubierta. Precios simulados; las fuentes y la metodología están aquí." |
 | 7:15–8:00 | Respaldo | Cambiar a la pestaña de `index.html` abierta con doble clic. | "Si el servidor falla, la página no se rompe: entra en modo demo con respuestas precalculadas del mismo modelo, y lo dice arriba." |
 
 > Las cifras del guion son de la corrida del 2026-11-26. Si se regeneran los datos otro día, cambian un poco: léanlas de la pantalla.

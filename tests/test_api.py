@@ -11,8 +11,8 @@ from pathlib import Path
 from unittest import mock
 
 _TMP = tempfile.TemporaryDirectory()
-os.environ["ZEROMERMA_DB"] = str(Path(_TMP.name) / "restaurante.db")
-os.environ["ZEROMERMA_MODELO"] = str(Path(_TMP.name) / "modelo_rf.pkl")
+os.environ["OPSIA_DB"] = str(Path(_TMP.name) / "restaurante.db")
+os.environ["OPSIA_MODELO"] = str(Path(_TMP.name) / "modelo_rf.pkl")
 os.environ["GEMINI_API_KEY"] = ""   # las pruebas nunca llaman a la API real, aunque exista un .env
 
 from fastapi.testclient import TestClient  # noqa: E402
@@ -197,16 +197,6 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(len(d["serie"]), d["periodo"]["dias"])
         self.assertEqual(self.cliente.get("/api/historial-compras", params={"insumo": "caviar"}).status_code, 404)
         self.assertEqual(self.cliente.get("/api/historial-compras", params={"agrupar": "anio"}).status_code, 422)
-
-    # --- Auditoría ---
-    def test_auditoria_ultimos_7_dias(self):
-        d = self.cliente.get("/api/auditoria").json()
-        self.assertEqual(len(d["serie"]), 7)
-        self.assertLess(d["periodo"]["modelo_entrenado_hasta"], d["periodo"]["desde"])  # sin fuga de datos
-        t = d["totales"]
-        self.assertAlmostEqual(t["merma_evitada_mxn"], t["tradicional"]["merma_mxn"] - t["zeromerma"]["merma_mxn"], 1)
-        self.assertTrue(d["es_simulado"])
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,13 +5,13 @@
 
 ## 1. Objetivo
 
-Definir **qué hace** ZeroMerma AI, **cómo se organiza** el código y **cómo se comunican** sus partes, antes de escribir el backend, el modelo y la integración con Gemini. Este documento es el contrato que siguen los 5 integrantes del equipo.
+Definir **qué hace** Opsia, **cómo se organiza** el código y **cómo se comunican** sus partes, antes de escribir el backend, el modelo y la integración con Gemini. Este documento es el contrato que siguen los 5 integrantes del equipo.
 
 ## 2. Problema y propuesta
 
 Un restaurante de plaza comercial compra insumos perecederos **por intuición**. Si compra de más, el excedente caduca en almacén (merma). Si recorta al tanteo, se queda sin platillos en hora pico (desabasto o *stockout*).
 
-ZeroMerma AI ataca el problema en tres momentos del día:
+Opsia ataca el problema en tres momentos del día:
 
 | Momento | Pregunta del encargado | Módulo | Tecnología |
 |---|---|---|---|
@@ -19,7 +19,7 @@ ZeroMerma AI ataca el problema en tres momentos del día:
 | Durante el día | Tengo insumos por caducar, ¿cómo los vendo? | Rescate rentable en menú | Gemini con salida JSON |
 | Antes del cierre | Me va a sobrar comida, ¿a quién aviso? | Alerta temprana de excedentes | Proyección de ventas + Gemini |
 
-Y una cuarta vista demuestra el impacto: **Auditoría y backtesting**.
+Y una cuarta vista demuestra el impacto: **Historial de compras** (lo comprado contra lo consumido y lo que habría sugerido el modelo).
 
 ## 3. Funciones del sistema
 
@@ -39,8 +39,8 @@ Y una cuarta vista demuestra el impacto: **Auditoría y backtesting**.
 | RF-10 | Redactar el texto promocional para el menú digital del comensal. | 2 | `POST /api/optimizar-menu` |
 | RF-11 | Proyectar porciones sobrantes al cierre según la hora y el ritmo de ventas. | 3 | `POST /api/alerta-excedente` |
 | RF-12 | Generar una ficha de rescate (alimento, cantidad, ventana de recolección, nota de inocuidad). | 3 | `POST /api/alerta-excedente` |
-| RF-13 | Comparar día a día compra tradicional, demanda real y compra sugerida (backtesting). | 4 | `GET /api/auditoria` |
-| RF-16 | Consultar lo que se compró cada día según la base, agrupado por día, semana o mes, para todos los productos o uno, y cuánto se habría ahorrado con el modelo. | 5 | `GET /api/historial-compras` |
+| RF-13 | Consultar lo que se compró cada día según la base, agrupado por día, semana o mes, para todos los productos o uno, con zoom en la gráfica, y cuánto se habría ahorrado con el modelo. | 4 | `GET /api/historial-compras` |
+| RF-16 | Armar una lista de compras con varios insumos, cada uno con su margen, y copiarla o descargarla. | 1 | `POST /api/predecir` (uno por insumo) |
 | RF-14 | Mostrar en toda la interfaz que los datos son **SIMULADOS**. | Todas | Campo `origen_dato` en cada respuesta |
 | RF-15 | Funcionar sin internet hacia Gemini: modo *fallback* con respuestas calculadas localmente. | 2 y 3 | Campo `modo` en la respuesta |
 
@@ -63,7 +63,7 @@ Y una cuarta vista demuestra el impacto: **Auditoría y backtesting**.
 ```mermaid
 flowchart LR
     subgraph Navegador
-        UI[Frontend<br/>HTML + Tailwind + Vanilla JS + Chart.js<br/>5 vistas]
+        UI[Frontend<br/>HTML + Tailwind + Vanilla JS + Chart.js<br/>4 vistas]
     end
 
     subgraph Servidor["Servidor local · uvicorn :8000"]
@@ -98,7 +98,7 @@ Un solo proceso FastAPI sirve la API, el modelo y el frontend. Para un sprint de
 | Modelo | scikit-learn `RandomForestRegressor` | Funciona bien con pocos datos tabulares, captura interacciones (quincena × fin de semana) y trae `feature_importances_` para explicar. |
 | Backend | FastAPI + uvicorn | Valida entradas con Pydantic, genera documentación automática en `/docs` y es fácil de leer. |
 | IA generativa | Google Gemini con el SDK `google-genai` y `response_schema` | La respuesta llega como JSON con estructura fija, no como texto libre de chatbot. |
-| Frontend | HTML5, Tailwind (CDN), Vanilla JS, Chart.js, Lucide | Sin build ni Node.js. Parte del prototipo `prueba1/`. |
+| Frontend | HTML5, Tailwind (CDN), Vanilla JS, Chart.js (+ chartjs-plugin-zoom), Lucide | Sin build ni Node.js. |
 
 ## 5. Estructura de carpetas
 
@@ -125,16 +125,15 @@ Hackateate_2026/
 │   └── services/
 │       ├── rescate_menu.py        ✅ Apartado 4 · promociones (reglas + validación de Gemini)
 │       ├── alerta_excedente.py    ✅ Apartado 4 · proyección y ficha de rescate
-│       └── historial_compras.py   ✅ Vista 5 · compras por día, semana o mes vs. modelo
+│       └── historial_compras.py   ✅ Vista 4 · compras por día, semana o mes vs. modelo
 ├── frontend/
-│   ├── index.html                 ✅ Apartado 5 · 5 vistas
+│   ├── index.html                 ✅ Apartado 5 · 4 vistas
 │   ├── app.js                     ✅ Apartado 5 · consume /api/* con respaldo local
 │   └── datos_demo.js              ✅ Apartado 5 · respuestas precalculadas (modo demo autónoma)
 ├── scripts/
 │   ├── exportar_datos_demo.py     ✅ Apartado 5 · genera frontend/datos_demo.js
 │   ├── exportar_csv.py            ✅ exporta la base a CSV para Excel
 │   └── prueba_humo.py             ✅ Apartado 7 · prueba de punta a punta por HTTP
-├── prueba1/                       ✅ prototipo visual 100 % en navegador (referencia de diseño)
 ├── tests/
 │   ├── test_generar_datos.py      ✅ Apartado 2
 │   ├── test_modelo_demanda.py     ✅ Apartado 3
@@ -164,27 +163,25 @@ Hackateate_2026/
 | `POST /api/optimizar-menu` | 2 | `horas_umbral`, `usar_gemini` | `modo` (gemini/fallback) y estrategias sobre platillos existentes |
 | `POST /api/alerta-excedente` | 3 | `hora_actual`, `ritmo_ventas` | proyección de cierre y ficha de recolección |
 | `POST /api/alerta-excedente/{id}/enviar` | 3 | — | envío SIMULADO registrado |
-| `GET /api/auditoria` | 4 | `dias`, `insumo` | serie diaria y totales de merma evitada en kg y $MXN |
-| `GET /api/historial-compras` | 5 | `agrupar`, `insumo` | compras registradas vs. consumo vs. sugerencia del modelo, y ahorro |
+| `GET /api/historial-compras` | 4 | `agrupar`, `insumo` | compras registradas vs. consumo vs. sugerencia del modelo, y ahorro |
 
 Todas las respuestas incluyen `es_simulado` mientras la base sea simulada.
 
-## 7. Flujo UX de las 5 vistas
+## 7. Flujo UX de las 4 vistas
 
 ```mermaid
 flowchart TD
-    A[Encargado abre ZeroMerma AI] --> B{Momento del día}
+    A[Encargado abre Opsia] --> B{Momento del día}
     B -- "Mañana: antes de comprar" --> V1[Vista 1 · Planeador de compras]
-    V1 --> V1a[Elige insumo, contexto y margen] --> V1b[Ve compra sugerida, inversión y merma evitada]
+    V1 --> V1a[Elige insumo, contexto y margen] --> V1b[Ve compra sugerida, inversión y merma evitada] --> V1d[Agrega a la lista de compras]
     V1b -- "margen < 4 %" --> V1c[Banner de riesgo de desabasto]
     B -- "Medio día: revisa almacén" --> V2[Vista 2 · Rescate rentable en menú]
     V2 --> V2a[Ve inventario con semáforo] --> V2b[Clic en Optimizar menú con Gemini]
     V2b --> V2c[Promociones sobre platillos existentes + vista previa del menú QR]
     B -- "Tarde: monitoreo del turno" --> V3[Vista 3 · Alerta temprana]
     V3 --> V3a[Hora y ritmo de ventas] -- "sobrante proyectado" --> V3b[Genera ficha de rescate] --> V3c[Envía aviso al comedor comunitario]
-    B -- "Semanal: rendir cuentas" --> V4[Vista 4 · Auditoría y backtesting]
-    B -- "Mensual: revisar compras" --> V5[Vista 5 · Historial de compras]
-    V5 --> V5a[Día, semana o mes · todos o un producto] --> V5b[Comprado vs. consumido vs. sugerido y ahorro]
+    B -- "Semana o mes: rendir cuentas" --> V4[Vista 4 · Historial de compras]
+    V4 --> V4a[Día, semana o mes · todos o un producto · zoom] --> V4b[Comprado vs. consumido vs. sugerido y ahorro]
     V4 --> V4a[KPIs + gráfica semanal + fuentes y metodología]
 ```
 
@@ -193,7 +190,7 @@ flowchart TD
 | 1. Planeador de compras (ML) | Encargado de compras | Fecha, insumo, contexto, margen | Compra sugerida, inversión, merma evitada, explicabilidad |
 | 2. Rescate rentable (Gemini) | Chef / gerente | Clic en "Optimizar" | 2 o más promociones rentables y su texto para el menú |
 | 3. Alerta temprana | Gerente de turno | Hora y ritmo de ventas | Ficha de rescate lista para enviar |
-| 4. Auditoría | Dueño / jueces | Rango de días | Ahorro, kg rescatados, comparación diaria |
+| 4. Historial de compras | Dueño / jueces | Agrupación y producto | Ahorro en compras, merma evitada, comparación por periodo |
 
 En todas las vistas, la barra superior muestra el badge **⚠️ Entorno de Validación: Datos Simulados**.
 
@@ -226,5 +223,5 @@ sequenceDiagram
 ## 10. Cómo verificar este apartado
 
 1. La estructura de carpetas del repositorio coincide con la sección 5 (las rutas ✅ existen).
-2. Cada vista del prototipo `prueba1/` corresponde a una función RF de la sección 3.
+2. Cada vista de `frontend/` corresponde a una función RF de la sección 3.
 3. Cada endpoint de la sección 6 tiene un requisito funcional que lo justifica, y viceversa.

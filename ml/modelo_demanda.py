@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ZeroMerma AI — Modelo predictivo de demanda (Random Forest)
+Opsia — Modelo predictivo de demanda (Random Forest)
 Archivo: /ml/modelo_demanda.py
 
 Qué hace
@@ -287,8 +287,8 @@ def validar(datos: dict, margen_referencia: float = 0.08) -> dict:
         "time_series_split": cortes,
         "impacto_mes_prueba": {
             "compra_tradicional": impacto(trad),
-            f"zeromerma_margen_fijo_{round(margen_referencia * 100)}pct": impacto(pred_ins * (1 + margen_referencia)),
-            "zeromerma_margen_recomendado": impacto(pred_ins * (1 + margen_p90)),
+            f"opsia_margen_fijo_{round(margen_referencia * 100)}pct": impacto(pred_ins * (1 + margen_referencia)),
+            "opsia_margen_recomendado": impacto(pred_ins * (1 + margen_p90)),
             "nota": "Valuado a precios SIMULADOS. Sobrante = compra − consumo real (no todo se tira: "
                     "depende de la vida útil). Demanda no cubierta = valor del faltante / valor del consumo real.",
         },
@@ -303,7 +303,7 @@ def validar(datos: dict, margen_referencia: float = 0.08) -> dict:
 
 def predicciones_historicas(datos: dict, margenes: np.ndarray) -> dict:
     """
-    Compra que habría sugerido ZeroMerma AI para CADA día del historial, sin ver ese día:
+    Compra que habría sugerido Opsia para CADA día del historial, sin ver ese día:
     ventana creciente, se reentrena cada 30 días con todo lo anterior (primeros 60 días: sin dato).
     compra_sugerida = predicción × (1 + margen recomendado del insumo).
     """
@@ -489,59 +489,11 @@ def predecir_compra(insumo: str, dia_semana: int, es_quincena: bool, lluvia: boo
 
 
 # =============================================================================
-# 5. BACKTESTING ("máquina del tiempo") PARA LA VISTA DE AUDITORÍA
-# =============================================================================
-
-def backtest(ultimos_dias: int = 7, margen: float | None = None, ruta_db: Path = RUTA_DB,
-             ruta_modelo: Path = RUTA_MODELO) -> dict:
-    """
-    ¿Qué habría pasado en los últimos `ultimos_dias` días cerrados si se hubiera comprado
-    con ZeroMerma AI?
-
-    Para no hacer trampa, entrena un modelo NUEVO solo con los días anteriores a ese
-    periodo (el modelo guardado ya los vio). Cada día se compra
-    predicción × (1 + margen); si `margen` es None se usa el margen recomendado de
-    cada insumo guardado en el modelo.
-
-    Devuelve arreglos por día × insumo con la compra tradicional, el consumo real y la
-    compra sugerida, más los datos de cada insumo.
-    """
-    datos = cargar_datos(ruta_db)
-    n = len(datos["X"])
-    if not 1 <= ultimos_dias <= n - 60:
-        raise ValueError(f"ultimos_dias debe estar entre 1 y {n - 60}")
-    corte = n - ultimos_dias
-
-    modelo = _nuevo_rf().fit(datos["X"][:corte], datos["Y"][:corte])
-    prediccion = np.maximum(modelo.predict(datos["X"][corte:])[:, 1:], 0)
-
-    claves = [i["clave"] for i in datos["insumos"]]
-    if margen is None:
-        recomendado = cargar_modelo(ruta_modelo)["margen_recomendado_p90"]
-        margenes = np.array([recomendado.get(c, 0.08) for c in claves])
-    else:
-        if not 0 <= margen <= MARGEN_MAXIMO:
-            raise ValueError(f"margen debe estar entre 0 y {MARGEN_MAXIMO}")
-        margenes = np.full(len(claves), margen)
-
-    return {
-        "fechas": datos["fechas"][corte:],
-        "insumos": datos["insumos"],
-        "compra_tradicional": datos["compra_tradicional"][corte:],
-        "consumo_real": datos["Y"][corte:, 1:],
-        "compra_sugerida": prediccion * (1 + margenes),
-        "margenes": margenes,
-        "entrenado_hasta": datos["fechas"][corte - 1],
-        "origen_dato": datos["origen_dato"],
-    }
-
-
-# =============================================================================
-# 6. LÍNEA DE COMANDOS
+# 5. LÍNEA DE COMANDOS
 # =============================================================================
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Modelo de demanda de ZeroMerma AI (datos SIMULADOS).")
+    p = argparse.ArgumentParser(description="Modelo de demanda de Opsia (datos SIMULADOS).")
     sub = p.add_subparsers(dest="comando", required=True)
 
     e = sub.add_parser("entrenar", help="Valida, entrena y guarda ml/modelo_rf.pkl")
