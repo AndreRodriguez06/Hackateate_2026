@@ -18,7 +18,7 @@ Demostrar que cualquier persona puede clonar el repositorio, instalarlo y usar e
 | `git clone` desde GitHub en carpeta vacía + entorno virtual nuevo | Simula una computadora limpia. |
 | Python 3.10.20 y 3.13.18 | Versión mínima declarada y versión reciente. |
 | `requirements.txt` con versiones fijas | Instalación reproducible. |
-| `python -m unittest` (64 pruebas; 56 en la corrida original) | Pruebas unitarias y de API. |
+| `python -m unittest` (66 pruebas; 56 en la corrida original) | Pruebas unitarias y de API. |
 | `scripts/prueba_humo.py` (8 casos) | Prueba de punta a punta por HTTP; cualquiera la puede correr. |
 | Chromium + Playwright (8 casos) | Prueba de punta a punta en navegador. |
 | Llamada real a la API de Gemini con llave falsa | Verifica el respaldo ante un error real de Google. |
@@ -154,14 +154,14 @@ En una computadora que **no** haya tenido el proyecto:
 - [ ] `python -m venv .venv`, activarlo y `pip install -r requirements.txt` sin errores.
 - [ ] `python data/generar_datos.py` termina con "Verificación OK".
 - [ ] `uvicorn backend.main:app --reload` arranca y <http://localhost:8000> muestra el distintivo ámbar y "API conectada".
-- [ ] `python -m unittest discover -s tests` → 64 pruebas OK.
+- [ ] `python -m unittest discover -s tests` → 66 pruebas OK.
 - [ ] Con el servidor encendido, `python scripts/prueba_humo.py` → 9/9.
 - [ ] Sin `.env`: la Vista 2 muestra "Reglas locales (modo respaldo)".
-- [ ] Con `.env` y llave real: la Vista 2 muestra "Generado con Gemini · gemini-2.5-flash".
+- [ ] Con `.env` y llave real: la Vista 2 muestra "Generado con Gemini · gemini-3.5-flash-lite".
 - [ ] Doble clic en `frontend/index.html` → "Modo demo autónoma".
 - [ ] `git status` no muestra `.env` ni `*.db` ni `*.pkl` para subir.
 - [ ] Tabla de equipo del README completa con roles y aportaciones reales.
-- [ ] Enlace a `docs/08_plan_negocios.md` funcionando (Apartado 8).
+- [ ] Enlaces de la Tabla A de `docs/08_plan_negocios.md` revisados el día de la entrega (precios de nube, Gemini y tipo de cambio cambian).
 
 ## 8. Reparto de la defensa (25 minutos)
 
@@ -179,7 +179,7 @@ Recomendaciones para la demo:
 ## 9. Cómo repetir estas pruebas
 
 ```bash
-python -m unittest discover -s tests -v        # 64 pruebas
+python -m unittest discover -s tests -v        # 66 pruebas
 uvicorn backend.main:app                       # en otra terminal
 python scripts/prueba_humo.py                  # 9 casos de punta a punta
 ```

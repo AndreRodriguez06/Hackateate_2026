@@ -1,7 +1,7 @@
 # 04 · Backend y API REST (FastAPI)
 
 > **Apartado 4 · Orden 2.1** de la Tabla de Medios y Fines.
-> Estado: ✅ implementado y probado (`tests/test_api.py`, 20 pruebas). Total del repositorio: 64 pruebas.
+> Estado: ✅ implementado y probado (`tests/test_api.py`, 20 pruebas). Total del repositorio: 66 pruebas.
 
 > ⚠️ **Todas las respuestas provienen de datos SIMULADOS.** Cada respuesta incluye `es_simulado: true`, y los lotes del inventario lo indican uno por uno.
 
@@ -36,7 +36,7 @@ Se desactiva con `ZEROMERMA_AUTOPREPARAR=0`.
 | `ZEROMERMA_AUTOPREPARAR` | `0` desactiva la preparación automática | `1` |
 | `PORT` | Puerto con `python backend/main.py` | `8000` |
 | `GEMINI_API_KEY` | Llave de Gemini (también se lee de `.env`) | sin definir → modo `fallback` |
-| `GEMINI_MODEL` · `GEMINI_TIMEOUT_MS` | Modelo y tiempo máximo de espera | `gemini-2.5-flash` · `15000` |
+| `GEMINI_MODEL` · `GEMINI_TIMEOUT_MS` | Modelo y tiempo máximo de espera | `gemini-3.5-flash-lite` · `15000` |
 
 ## 3. Arquitectura del backend
 
@@ -376,7 +376,7 @@ Errores: **404** insumo inexistente · **422** agrupación inválida · **503** 
 
 1. `python backend/main.py` y abrir <http://localhost:8000/docs>: aparecen los 9 endpoints.
 2. En `/docs`, probar `POST /api/predecir` con margen `0.02`: `riesgo_desabasto: true`.
-3. `python -m unittest discover -s tests -v`: 64 pruebas. Las 20 de la API comprueban:
+3. `python -m unittest discover -s tests -v`: 66 pruebas. Las 20 de la API comprueban:
    - el arranque genera datos y modelo;
    - el inventario está ordenado y con el semáforo correcto, y el filtro por estado funciona;
    - la predicción cumple la fórmula, alerta el desabasto y responde 422/400 a entradas inválidas;

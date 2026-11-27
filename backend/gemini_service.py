@@ -27,7 +27,8 @@ Plan de contingencia (modo respaldo):
 
 Configuración (variables de entorno o archivo .env en la raíz del repo):
   GEMINI_API_KEY      llave de Google AI Studio (obligatoria para usar Gemini)
-  GEMINI_MODEL        por defecto "gemini-2.5-flash"
+  GEMINI_MODEL        por defecto "gemini-3.5-flash-lite" (gemini-2.5-flash solo sigue disponible
+                      para cuentas que ya lo usaban; ver docs/06_integracion_gemini.md)
   GEMINI_TIMEOUT_MS   por defecto 15000 (15 s)
 """
 
@@ -47,6 +48,7 @@ DESCUENTO_MIN_PCT = 10
 DESCUENTO_MAX_PCT = 30
 HORAS_MINIMAS_ANTES_CIERRE = 2.0
 LONGITUD_COPY = 160
+MODELO_POR_DEFECTO = "gemini-3.5-flash-lite"
 
 
 # =============================================================================
@@ -79,7 +81,7 @@ _cargar_env()
 
 
 def modelo() -> str:
-    return os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    return os.getenv("GEMINI_MODEL", MODELO_POR_DEFECTO)
 
 
 def configurado() -> bool:
@@ -151,17 +153,18 @@ def _generar(instruccion_sistema: str, contenido: str, esquema: type[BaseModel])
     """Una llamada a Gemini con salida JSON forzada al esquema Pydantic."""
     from google.genai import types
 
+    opciones = {
+        "system_instruction": instruccion_sistema,
+        "response_mime_type": "application/json",
+        "response_schema": esquema,
+        "temperature": 0.3,                    # creatividad baja: es una tarea operativa
+    }
+    if modelo().startswith("gemini-2.5"):
+        # En la familia 2.5, thinking_budget=0 apaga el razonamiento extendido (menor latencia).
+        # Los modelos más nuevos usan su configuración por defecto.
+        opciones["thinking_config"] = types.ThinkingConfig(thinking_budget=0)
     respuesta = _cliente().models.generate_content(
-        model=modelo(),
-        contents=contenido,
-        config=types.GenerateContentConfig(
-            system_instruction=instruccion_sistema,
-            response_mime_type="application/json",
-            response_schema=esquema,
-            temperature=0.3,                                         # creatividad baja: es una tarea operativa
-            thinking_config=types.ThinkingConfig(thinking_budget=0),  # sin razonamiento extendido: menor latencia
-        ),
-    )
+        model=modelo(), contents=contenido, config=types.GenerateContentConfig(**opciones))
     if isinstance(getattr(respuesta, "parsed", None), esquema):
         return respuesta.parsed
     if not getattr(respuesta, "text", None):
@@ -179,6 +182,8 @@ def _motivo(err: Exception) -> str:
         return "La GEMINI_API_KEY no es válida."
     if codigo == 429 or "RESOURCE_EXHAUSTED" in texto:
         return "Se agotó la cuota de Gemini por ahora."
+    if codigo == 404 or "NOT_FOUND" in texto or "no longer available" in texto:
+        return f"El modelo {modelo()} no está disponible para esta llave. Prueba GEMINI_MODEL={MODELO_POR_DEFECTO}."
     if codigo in (401, 403) or "PERMISSION_DENIED" in texto:
         return "La llave de Gemini no tiene permiso para este modelo."
     if isinstance(err, TimeoutError) or "timed out" in texto.lower() or "Timeout" in type(err).__name__:

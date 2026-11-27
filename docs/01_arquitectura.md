@@ -148,7 +148,7 @@ Hackateate_2026/
     ├── 05_frontend_ux.md          ✅ Apartado 5
     ├── 06_integracion_gemini.md   ✅ Apartado 6
     ├── 07_integracion_pruebas.md  ✅ Apartado 7
-    └── 08_plan_negocios.md        Apartado 8
+    └── 08_plan_negocios.md        ✅ Apartado 8
 ```
 
 ## 6. Contratos de la API

@@ -59,7 +59,7 @@ flowchart LR
     API --> DB[(SQLite<br/>data/restaurante.db)]
     API --> ML[Random Forest<br/>ml/modelo_rf.pkl]
     API --> G[gemini_service.py]
-    G -- "response_schema JSON" --> GEM[[Google Gemini 2.5 Flash]]
+    G -- "response_schema JSON" --> GEM[[Google Gemini 3.5 Flash-Lite]]
     G -. "sin llave / sin red / respuesta inválida" .-> R[Reglas locales<br/>modo respaldo]
     U -. "sin servidor" .-> DEMO[datos_demo.js<br/>modo demo autónoma]
 ```
@@ -77,7 +77,7 @@ Lo más importante del diseño:
 | **scikit-learn · Random Forest** | Predicción de demanda | Funciona bien con pocos datos tabulares, encuentra combinaciones entre variables sin programarlas a mano (lluvia en fin de semana), no predice cantidades negativas y explica qué variables pesaron (`feature_importances_`). Se compara en cada entrenamiento contra una regresión lineal y un promedio. |
 | **FastAPI + Pydantic** | API REST y servidor del frontend | Valida entradas automáticamente, genera documentación interactiva en `/docs` y sirve la API y la página en un solo comando. |
 | **HTML + Tailwind CSS + Chart.js + Lucide (CDN)** | Interfaz | Sin compilación ni Node.js: se abre con doble clic. Responsiva para usarse desde el celular en el almacén. |
-| **Google Gemini 2.5 Flash (`google-genai`)** | Promociones y fichas de rescate | Rápido y económico para tareas cortas. Con *Structured Outputs* (`response_schema` Pydantic) responde JSON con esquema fijo: no es un chatbot. |
+| **Google Gemini 3.5 Flash-Lite (`google-genai`)** | Promociones y fichas de rescate | Rápido y económico para tareas cortas. Con *Structured Outputs* (`response_schema` Pydantic) responde JSON con esquema fijo: no es un chatbot. |
 
 ---
 
@@ -129,7 +129,7 @@ Para comprobar que Gemini funciona: `python backend/gemini_service.py`. Debe mos
 ### Verificar que todo funciona
 
 ```bash
-python -m unittest discover -s tests -v    # 64 pruebas automáticas (datos, modelo, API, Gemini)
+python -m unittest discover -s tests -v    # 66 pruebas automáticas (datos, modelo, API, Gemini)
 python scripts/prueba_humo.py              # 9 casos de punta a punta, con el servidor encendido
 ```
 
@@ -188,7 +188,7 @@ Hackateate_2026/
 ├── backend/     main.py · database.py · gemini_service.py · services/ (rescate_menu, alerta_excedente, historial_compras)
 ├── frontend/    index.html · app.js · datos_demo.js
 ├── scripts/     exportar_datos_demo.py · exportar_csv.py · prueba_humo.py
-├── tests/       64 pruebas automáticas (unittest)
+├── tests/       66 pruebas automáticas (unittest)
 ├── docs/        documentación por apartado
 └── prueba1/     primer prototipo visual (referencia; cifras ilustrativas)
 ```
@@ -204,7 +204,7 @@ Hackateate_2026/
 | 05 | [`docs/05_frontend_ux.md`](docs/05_frontend_ux.md) | Interfaz, modo demo, decisiones de diseño y guion de la demo |
 | 06 | [`docs/06_integracion_gemini.md`](docs/06_integracion_gemini.md) | Esquemas JSON, prompts, validaciones y contingencias |
 | 07 | [`docs/07_integracion_pruebas.md`](docs/07_integracion_pruebas.md) | Bitácora de pruebas de punta a punta y checklist de entrega |
-| 08 | [`docs/08_plan_negocios.md`](docs/08_plan_negocios.md) | Plan de negocios y viabilidad (en preparación) |
+| 08 | [`docs/08_plan_negocios.md`](docs/08_plan_negocios.md) | Plan de negocios: fuentes verificables, supuestos, competencia, costos, punto de equilibrio e impacto económico |
 
 ---
 
@@ -226,7 +226,7 @@ Hackateate_2026/
 
 - **Datos simulados:** el modelo aprendió reglas que nosotros definimos. Sus métricas prueban el método, no la precisión en un negocio real.
 - **Precios provisionales:** aún no se sustituyen por precios consultados en PROFECO.
-- **Gemini:** la integración está probada con respuestas simuladas y con la API real hasta la autenticación. Hay que confirmar con una llave válida que los textos generados sean adecuados.
+- **Gemini:** la integración está probada con respuestas simuladas y con la API real hasta la autenticación. Hay que confirmar con una llave válida que los textos generados sean adecuados. El modelo por defecto es `gemini-3.5-flash-lite` porque `gemini-2.5-flash` ya no se ofrece a proyectos nuevos.
 - **Inventario simplificado:** cada día se evalúa por separado; el sobrante no pasa al día siguiente.
 - **Supuestos de negocio no medidos:** el aumento de ventas por descuento y la curva de ventas por hora son supuestos.
 - **Un solo restaurante, sin usuarios ni contraseñas**; pensado para correr localmente.

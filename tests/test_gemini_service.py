@@ -168,12 +168,30 @@ class TestLlamadaAlSDK(unittest.TestCase):
             r = gs.generar_promociones_menu(CRITICOS, MENU)
         self.assertFalse(r["modo_respaldo"])
         kwargs = modelos.generate_content.call_args.kwargs
-        self.assertEqual(kwargs["model"], "gemini-2.5-flash")
+        self.assertEqual(kwargs["model"], gs.MODELO_POR_DEFECTO)
         cfg = kwargs["config"]
+        self.assertIsNone(cfg.thinking_config)                  # thinking_budget solo se manda a la familia 2.5
         self.assertEqual(cfg.response_mime_type, "application/json")
         self.assertIs(cfg.response_schema, gs.RespuestaPromociones)
         self.assertIn("No conversas", cfg.system_instruction)
         self.assertIn("platillos_candidatos", kwargs["contents"])
+
+    def test_thinking_budget_solo_en_familia_2_5(self):
+        esperado = promos({"platillo_clave": "quesadillas", "descuento_pct": 20})
+        modelos = mock.Mock()
+        modelos.generate_content.return_value = SimpleNamespace(parsed=esperado, text=None)
+        with mock.patch.dict(os.environ, {"GEMINI_MODEL": "gemini-2.5-flash"}), \
+                mock.patch.object(gs, "_cliente", return_value=SimpleNamespace(models=modelos)):
+            gs.generar_promociones_menu(CRITICOS, MENU)
+        self.assertEqual(modelos.generate_content.call_args.kwargs["config"].thinking_config.thinking_budget, 0)
+
+    def test_modelo_no_disponible_explica_que_cambiar(self):
+        error = Exception("404 NOT_FOUND. models/gemini-x is not found")
+        error.code = 404
+        with mock.patch.object(gs, "_generar", side_effect=error):
+            r = gs.generar_promociones_menu(CRITICOS, MENU)
+        self.assertTrue(r["modo_respaldo"])
+        self.assertIn("no está disponible para esta llave", r["motivo_respaldo"])
 
     def test_si_parsed_viene_vacio_usa_el_texto_json(self):
         texto = ficha().model_dump_json()
