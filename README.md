@@ -14,7 +14,7 @@ Requiere Python 3.10 o superior.
 git clone https://github.com/AndreRodriguez06/Hackateate_2026.git
 cd Hackateate_2026
 pip install -r requirements.txt
-python backend/main.py
+py data/generar_datos.py && py -m uvicorn backend.main:app --reload
 ```
 
 Abrir **<http://localhost:8000>**. La primera vez el servidor genera los datos simulados y entrena el modelo (≈ 10 s).
