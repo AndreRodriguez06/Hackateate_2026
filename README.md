@@ -91,11 +91,11 @@ El restaurante, su menú, su historial de ventas, su inventario y sus precios so
 
 | Integrante | Rol | GitHub |
 |---|---|---|
-| Andre | _por completar_ | [@AndreRodriguez06](https://github.com/AndreRodriguez06) |
-| César | _por completar_ | [@CesarE-gith](https://github.com/CesarE-gith) |
-| Diego | _por completar_ | [@DiegoHR14](https://github.com/DiegoHR14) |
-| Isaac | _por completar_ | _por completar_ |
-| Alan | _por completar_ | _por completar_ |
+| Andre | Backend | [@AndreRodriguez06](https://github.com/AndreRodriguez06) |
+| César | Analisis del problema/backend | [@CesarE-gith](https://github.com/CesarE-gith) |
+| Diego | Base de datos | [@DiegoHR14](https://github.com/DiegoHR14) |
+| Isaac | Frontend | risaac.herrera@gmail.com |
+| Alan | Analisis del problema | [@alanguapo](https://github.com/alanguapo) |
 
 ---
 
