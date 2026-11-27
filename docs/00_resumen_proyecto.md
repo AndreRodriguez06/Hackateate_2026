@@ -1,8 +1,8 @@
-# 00 · Resumen completo del proyecto Opsia
+# Resumen completo del proyecto OpsIA
 
 > Versión extendida del README (problema, usuarios, evidencia, tecnologías, declaración de simulaciones, resultados, equipo, limitaciones y próximos pasos). El [README](../README.md) de la raíz es la guía breve para ejecutar.
 
-**Control operativo de cocina para reducir la merma de alimentos en restaurantes.** Opsia predice cuánto comprar de cada insumo con Machine Learning, propone promociones rentables con Google Gemini para vender lo que está por caducar y avisa a tiempo a comedores comunitarios cuando va a sobrar comida.
+**Control operativo de cocina para reducir la merma de alimentos en restaurantes.** OpsIA predice cuánto comprar de cada insumo con Machine Learning, propone promociones rentables con Google Gemini para vender lo que está por caducar y avisa a tiempo a comedores comunitarios cuando va a sobrar comida.
 
 > ⚠️ **Entorno de validación: todos los datos son SIMULADOS.** El restaurante, su historial, su inventario y sus precios son ficticios. La sección [Declaración de simulaciones](#declaración-de-simulaciones) detalla qué es simulado y dónde empieza la simulación.
 
@@ -207,21 +207,7 @@ Hackateate_2026/
 
 ---
 
-## 8. Equipo
-
-| Integrante | Rol | Aportaciones |
-|---|---|---|
-| Andre | _por completar_ | _por completar_ |
-| César | _por completar_ | _por completar_ |
-| Isaac | _por completar_ | _por completar_ |
-| Diego | _por completar_ | _por completar_ |
-| Alan | _por completar_ | _por completar_ |
-
-Áreas del proyecto que conviene repartir para la defensa: datos simulados (02), modelo de ML (03), backend y API (04), interfaz y demo (05), integración con Gemini (06), pruebas (07) y plan de negocios (08).
-
----
-
-## 9. Limitaciones actuales
+## 8. Limitaciones actuales
 
 - **Datos simulados:** el modelo aprendió reglas que nosotros definimos. Sus métricas prueban el método, no la precisión en un negocio real.
 - **Precios provisionales:** aún no se sustituyen por precios consultados en PROFECO.
@@ -233,7 +219,7 @@ Hackateate_2026/
 - **Librerías del frontend por CDN:** sin internet la página pierde estilos y gráficas (la lógica sigue funcionando).
 - **Importancia de variables global:** explica el modelo en general, no cada predicción.
 
-## 10. Próximos pasos para un piloto real
+## 9. Próximos pasos para un piloto real
 
 1. **Línea base real:** pesar la merma de un restaurante durante 4 semanas antes de usar el sistema.
 2. **Cargar datos reales:** exportar ventas e inventario del punto de venta (CSV), registrar con `origen_dato = 'REAL'` y reentrenar el modelo.
